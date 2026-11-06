@@ -24,25 +24,26 @@ ME_C2 = 0.51099895  # MeV
 # ---------------------------------------------------------------------------
 # Alpha decay: the universal decay law (Qi, Xu, Liotta & Wyss, PRL 103, 072501,
 # 2009), refitted here.  It is the WKB tunnelling exponent through the Coulomb
-# barrier linearised in its two natural variables,
-#   log10 T(s) = a chi + b rho + c,
+# barrier linearised in its two natural variables, plus one hindrance term for
+# odd nuclei (whose decays must change the unpaired nucleon's orbit),
+#   log10 T(s) = a chi + b rho + c + h [Z or N odd],
 #   chi = Z_a Z_d sqrt(A_red / Q),  rho = sqrt(A_red Z_a Z_d (A_d^1/3 + A_a^1/3)),
-# with A_red = A_a A_d / (A_a + A_d).  Three coefficients, all with a physical
-# meaning, versus six for Viola-Seaborg.  Out of sample it is the better law:
-# fitted on Z < 104 and asked to predict Z >= 104 it misses by 0.5 decades,
-# Viola-Seaborg by 1.4 (see validation.py).
+# with A_red = A_a A_d / (A_a + A_d).  Four coefficients, all with a physical
+# meaning, versus six for Viola-Seaborg; on the 463 NUBASE2020 alpha emitters
+# it extrapolates better at every forward cut above Z = 104 (validation.py).
 # ---------------------------------------------------------------------------
 def udl_features(z: int, n: int, q: float) -> list[float]:
     zd, ad = z - 2, z + n - 4
     mu = 4 * ad / (ad + 4)
-    return [2 * zd * math.sqrt(mu / q), math.sqrt(mu * 2 * zd * (ad ** (1 / 3) + 4 ** (1 / 3))), 1.0]
+    return [2 * zd * math.sqrt(mu / q), math.sqrt(mu * 2 * zd * (ad ** (1 / 3) + 4 ** (1 / 3))), 1.0,
+            float((z % 2) or (n % 2))]
 
 
 @lru_cache(maxsize=1)
 def alpha_law() -> LinearLaw:
     X = [udl_features(z, a - z, q) for z, a, q, _ in data.ALPHA_DECAYS]
     y = [math.log10(t) for *_, t in data.ALPHA_DECAYS]
-    return LinearLaw.fit(X, y, names=("chi", "rho", "const"))
+    return LinearLaw.fit(X, y, names=("chi", "rho", "const", "odd_hindrance"))
 
 
 def log10_t_alpha(z: int, n: int, q: float) -> float:
@@ -78,14 +79,14 @@ def viola_seaborg_row(r):
 
 # ---------------------------------------------------------------------------
 # Spontaneous fission: Swiatecki-type systematic.
-#   log10 T_sf(s) = s0 + s1 u + s2 u^2 + k (-E_shell)   (+ odd hindrance)
+#   log10 T_sf(s) = s0 + s1 u + s2 u^2 + k (-E_shell) + h (n_odd)
 #   u = Z^2/A - 37.5
 # The fissility polynomial carries the liquid-drop trend and is held flat
 # beyond its minimum: once the liquid-drop barrier has vanished (Z^2/A ~ 44)
 # further charge no longer shortens the half-life -- only shell effects matter.
-# k is the shell slope (orders of magnitude per MeV of shell energy).  258Fm (anomalous symmetric fission) is excluded from the fit.
+# k is the shell slope (orders of magnitude per MeV of shell energy); the
+# odd-nucleon hindrance h (per odd nucleon type) is fitted, not assumed.  258Fm (anomalous symmetric fission) is excluded from the fit.
 # ---------------------------------------------------------------------------
-ODD_SF_HINDRANCE = 3.0  # orders of magnitude per odd nucleon type (typical)
 SF_EXCLUDED = {(100, 258)}
 
 
@@ -118,12 +119,11 @@ def fission_barrier(model: MassModel, z: int, n: int) -> float:
 # The predictive sd then grows with |E_shell| beyond the data -- by many
 # decades on the island, which is the honest state of knowledge.
 K_PRIOR_MEAN, K_PRIOR_SD = 2.25, 0.75
-ODD_SF_SD = 1.5  # uncertainty of the odd-nucleon hindrance, decades per odd type
 
 
 def _sf_features(model: MassModel, z: int, n: int, u_cap: float = math.inf):
     u = min(z * z / (z + n) - 37.5, u_cap)
-    return [1.0, u, u * u, -model.shell_energy(z, n)]
+    return [1.0, u, u * u, -model.shell_energy(z, n), float((z % 2) + (n % 2))]
 
 
 @lru_cache(maxsize=8)
@@ -135,11 +135,12 @@ def sf_law(hypothesis: str, prior: bool = True) -> tuple[LinearLaw, float]:
     pts = [(z, a, t) for z, a, t in data.SF_HALF_LIVES if (z, a) not in SF_EXCLUDED]
     X = [_sf_features(m, z, a - z) for z, a, _ in pts]
     y = [math.log10(t) for *_, t in pts]
-    kw = dict(prior_mean=[0, 0, 0, K_PRIOR_MEAN], prior_sd=[None, None, None, K_PRIOR_SD]) if prior else {}
+    kw = dict(prior_mean=[0, 0, 0, K_PRIOR_MEAN, 0],
+              prior_sd=[None, None, None, K_PRIOR_SD, None]) if prior else {}
     kw = {k: (np.array([np.inf if v is None else v for v in vv], float) if k == "prior_sd" else vv)
           for k, vv in kw.items()}
-    law = LinearLaw.fit(X, y, names=("s0", "s1", "s2", "k_shell"), **kw)
-    s0, s1, s2, _ = law.coef
+    law = LinearLaw.fit(X, y, names=("s0", "s1", "s2", "k_shell", "odd_hindrance"), **kw)
+    s0, s1, s2 = law.coef[:3]
     u_max = max(x[1] for x in X)
     u_cap = min(-s1 / (2 * s2), u_max) if s2 > 0 else u_max
     return law, float(u_cap)
@@ -148,7 +149,7 @@ def sf_law(hypothesis: str, prior: bool = True) -> tuple[LinearLaw, float]:
 def sf_fit(hypothesis: str):
     """Back-compatible summary: ((s0, s1, s2, k, u_cap), rms)."""
     law, u_cap = sf_law(hypothesis)
-    return (*map(float, law.coef), u_cap), law.rms()
+    return (*map(float, law.coef[:4]), u_cap), law.rms()
 
 
 def log10_t_sf(model: MassModel, z: int, n: int) -> float:
@@ -157,9 +158,7 @@ def log10_t_sf(model: MassModel, z: int, n: int) -> float:
 
 def log10_t_sf_with_sd(model: MassModel, z: int, n: int) -> tuple[float, float]:
     law, u_cap = sf_law(model.hypothesis)
-    m, sd = law.predict(_sf_features(model, z, n, u_cap))
-    odd = (z % 2) + (n % 2)
-    return m + ODD_SF_HINDRANCE * odd, math.hypot(sd, ODD_SF_SD * odd)
+    return law.predict(_sf_features(model, z, n, u_cap))
 
 
 # ---------------------------------------------------------------------------

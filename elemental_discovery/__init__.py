@@ -2,7 +2,8 @@
 
 Modules
 -------
-data          curated calibration data (masses, decays, cross sections, X-rays)
+nubase        evaluated NUBASE2020 masses, half-lives, branches, known nuclides
+data          calibration data (masses, decays, cross sections, X-rays)
 linear        linear laws with predictive variance, priors, closed-form LOO
 nuclear       macroscopic-microscopic mass model + Gaussian-process correction
 decay         alpha / fission / weak-decay half-lives and decay chains
@@ -15,4 +16,4 @@ calculus      probability of discovery: P(>= k anchored chains in D days)
 report        Markdown report and figures
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

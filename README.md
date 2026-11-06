@@ -18,13 +18,13 @@ The replacements are simpler or more principled, not bigger:
 * **One primitive** (`linear.py`). Every systematic is a linear law in log space that
   reports its *predictive* standard deviation `sd² = s² + xᵀCx`, which grows automatically as
   it extrapolates. Assumptions enter as explicit Gaussian priors, not hidden grid ranges.
-* **Alpha decay.** A 3-parameter WKB "universal decay law" replaces the 6-parameter
-  Viola–Seaborg form. Forward error is 0.53 decades instead of 1.41.
-* **Q-alpha error bars.** These were 2.5–3.5× too small out of sample. A distance-to-data
+* **Alpha decay.** A 4-parameter WKB "universal decay law" (three tunnelling terms plus a
+  fitted odd-nucleon hindrance) replaces the 6-parameter Viola–Seaborg form and extrapolates
+  better (worst forward error 0.93 vs 1.11 decades on the evaluated data).
+* **Q-alpha error bars.** These were 2–3.5× too small out of sample. A distance-to-data
   term, calibrated by forward tests, brings the forward z-rms to ≈ 1.
-* **Fission.** Fitted freely, the data show *no* shell stabilisation (k = 0.2 ± 1.0), so the
-  island of stability rests on a physics prior. That prior is now explicit, and its
-  consequence, several decades of uncertainty on the island, is reported.
+* **Fission.** A Bayesian law with an explicit shell-slope prior and a fitted odd-nucleon
+  hindrance. It reports the several decades of uncertainty on the island instead of hiding them.
 * **Null searches.** These are treated as zero-count Poisson exposures, not censored points,
   and each reaction is updated by its own failed search.
 * **Discovery calculus** (`calculus.py`). This reports one probability that matters,
@@ -47,21 +47,28 @@ The replacements are simpler or more principled, not bigger:
 ## Headline results
 
 These are model outputs, not established facts. See the report for the uncertainties.
+Since v0.3 every nuclear number is calibrated on the evaluated **NUBASE2020** table: 463 alpha
+emitters, 103 fission half-lives and 177 known nuclides with Z ≥ 100 (v0.2 had 47, 15 and
+hand-typed ranges).
 
+* **Fission is less shell-stabilised than assumed.** With 103 evaluated half-lives the shell
+  slope is *measured* (k = 0.44 ± 0.34 decades/MeV for shells at Z = 114), below the [1, 3.5]
+  v0.1 assumed. The odd-nucleon hindrance, fitted for the first time, is 1.4 ± 0.4 decades per
+  odd nucleon type, not the assumed 3.
 * **Best routes, as one-campaign discovery probabilities** (300 days, 3 anchored chains,
-  6 pµA): element 120 via 50Ti + 251Cf (≈ 0.9), element 119 via 50Ti + 249Bk or 51V + 248Cm
-  (≈ 0.75). The already-searched 50Ti + 249Cf drops to ≈ 0.6, and Es-target routes are
-  target-limited (≈ 0.2 or less).
-* **Separator flight losses.** Predicted element-120 half-lives are near the ~1 µs flight
-  time. Averaged over their uncertainty, about half of 296Ubn atoms decay before reaching
-  the detector if the shell is at Z = 114 (5–10 % under Z = 120/126).
-* **Shell hypotheses.** In sample Z = 120 fits best. Out of sample it predicts worst, and
-  Z = 126 predicts best. Element-122 chains discriminate at ≈ 3σ (not 5σ, once error bars are
-  calibrated).
+  6 pµA, averaged over shell hypotheses): element 119 via 50Ti + 249Bk or 51V + 248Cm (≈ 0.6),
+  element 120 via 50Ti + 251Cf (≈ 0.4). These are lower than in v0.2 because faster fission
+  now competes with alpha decay, so chains anchor to known nuclei less often. Es-target routes
+  are target-limited (≤ 0.2).
+* **Separator flight losses.** Averaged over the half-life uncertainty, about half of 296Ubn
+  atoms decay before reaching the detector if the shell is at Z = 114 (≈ 2 % under Z = 120/126).
+* **Shell hypotheses.** The model variant with its shell at Z = 126 predicts heavier nuclei best,
+  both in and out of sample. That is a statement about this model, not proof of a magic number.
+  The most discriminating measurement is now element 120 (296Ubn: 1.6 MeV spread, ≈ 4σ).
 * **Island of stability.** The longest lifetimes sit at N ≈ 183–184 under every hypothesis,
-  7 neutrons beyond anything made. Their *length* is prior-dominated (±5–7 decades).
-* **Natural occurrence.** Theory alone can no longer rule it out. The evidence against
-  primordial superheavies is experimental.
+  7 neutrons beyond anything made. Their length is uncertain by ±3–4 decades.
+* **Natural occurrence.** Survival over Solar-System ages is unlikely but not excluded by theory
+  (P ≈ 0.2). The evidence against primordial superheavies is experimental.
 
 ## Usage
 
@@ -81,11 +88,17 @@ running the mass-model forward tests. Both results are cached in
 
 ## Data and caveats
 
-The calibration data in `elemental_discovery/data.py` (AME2020/NUBASE2020
-masses and decay data, discovery-paper cross sections and limits, K X-ray
-energies) were compiled by hand and rounded. They are fine for calibrating
-phenomenological systematics, but check them against the evaluated tables
-before quoting any number.
+Masses, half-lives, branching ratios and the list of known nuclides come from **NUBASE2020**
+(F.G. Kondev et al., *Chin. Phys. C* 45, 030001 (2021)). `elemental_discovery/nubase2020_subset.txt`
+is an unmodified extract of the evaluated file (ground states with Z ≥ 80, plus light
+calibration nuclei); `tools/extract_nubase.py` regenerates it from the full `nubase_4.mas20.txt`.
+Superheavy masses are flagged `#` (systematic), but AME links them through measured decay
+energies, so Q-alpha differences reproduce the published values (the tests check this). Odd
+nuclei get an extra 0.25 MeV Q uncertainty, because their observed decays feed excited states
+whose energies are estimated.
+
+Fusion cross sections, upper limits and K X-ray energies are not in NUBASE. They were compiled
+by hand from the discovery papers and are rounded, so check them before quoting any number.
 
 This is a transparent, global model. It is not a substitute for
 state-of-the-art microscopic calculations. Its value is that every

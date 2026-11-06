@@ -45,9 +45,9 @@ def test_beta_stability_valley_for_uranium():
 
 
 # --------------------------------------------------------------- decay
-def test_viola_seaborg_calibration():
-    _, rms = decay.viola_seaborg_fit()
-    assert rms < 0.6
+def test_alpha_law_calibration():
+    # 463 evaluated emitters, odd ones hindered: ~0.75 decades out of sample
+    assert decay.alpha_law().loo_rms() < 0.9
     # 238U: Q = 4.27 MeV -> 4.47 Gyr
     lt = decay.log10_t_alpha(92, 146, 4.270)
     assert abs(lt - math.log10(4.468e9 * data.SECONDS_PER_YEAR)) < 1.0
@@ -184,7 +184,7 @@ def test_wkb_alpha_law_extrapolates_better_than_viola_seaborg():
 @pytest.mark.parametrize("h", HYPS)
 def test_qalpha_errors_are_calibrated_out_of_sample(h):
     cal = nuclear.forward_calibration(h)
-    assert cal["z_rms_gp_only"] > 2.0  # the uncalibrated GP was overconfident
+    assert cal["z_rms_gp_only"] > 1.5  # the uncalibrated GP was overconfident
     assert 0.8 < cal["z_rms_calibrated"] < 1.3
 
 
@@ -194,15 +194,17 @@ def test_qalpha_error_grows_with_distance():
     assert s == sorted(s) and s[-1] > 3 * s[0]
 
 
-def test_fission_shell_slope_is_prior_dominated():
+def test_fission_shell_slope_and_extrapolation():
     free, _ = decay.sf_law("Z=114", prior=False)
     post, _ = decay.sf_law("Z=114")
-    assert abs(free.coef[3]) < 2 * free.coef_sd()[3]  # data alone: consistent with zero
+    # evaluated data measure k, and it is weaker than the v0.1 assumption [1, 3.5]
+    assert free.coef_sd()[3] < 0.5 and free.coef[3] < decay.K_PRIOR_MEAN
     assert post.coef_sd()[3] < free.coef_sd()[3]
+    assert 0.5 < post.coef[4] < 2.5  # fitted odd hindrance, decades per odd nucleon type
     m = nuclear.get_model("Z=114")
     _, sd_known = decay.log10_t_sf_with_sd(m, 112, 172)
     _, sd_island = decay.log10_t_sf_with_sd(m, 114, 184)
-    assert sd_island > 2 * sd_known
+    assert sd_island > 1.3 * sd_known
 
 
 # --------------------------------------------------------------- Poisson exposure
@@ -249,3 +251,32 @@ def test_hypothesis_weights_normalised():
     from elemental_discovery.calculus import hypothesis_weights
     w = hypothesis_weights()
     assert abs(sum(w.values()) - 1) < 1e-12 and all(v > 0 for v in w.values())
+
+
+# --------------------------------------------------------------- evaluated data
+def test_nubase_subset_is_nubase2020():
+    from elemental_discovery import nubase
+    head = nubase.FILE.read_text().splitlines()[0]
+    assert "Nubase2020" in head and "Chin. Phys. C45, 030001" in head
+    assert abs(nubase.binding_energy_MeV(82, 208) - 1636.430) < 0.01  # AME2020 B(208Pb)
+    assert abs(data.B_HE4 - nubase.binding_energy_MeV(2, 4)) < 0.001
+
+
+@pytest.mark.parametrize("z,a,q", [(118, 294, 11.87), (116, 290, 11.00), (116, 292, 10.77),
+                                   (114, 288, 10.07), (114, 286, 10.37)])
+def test_systematic_superheavy_masses_preserve_measured_qalpha(z, a, q):
+    # Superheavy masses are '#' (systematic), but AME links them through the
+    # measured decay energies, so differences reproduce published Q-alpha.
+    from elemental_discovery import nubase
+    assert nubase.table()[(z, a)]["mass_systematic"]
+    assert abs(nubase.q_alpha_MeV(z, a) - q) < 0.03
+
+
+def test_evaluated_dataset_sizes_and_known_nuclides():
+    assert len(data.ALPHA_DECAYS) > 400 and sum(1 for r in data.ALPHA_DECAYS if r[0] >= 104) > 80
+    assert len(data.SF_HALF_LIVES) > 90
+    assert data.is_known(118, 294) and not data.is_known(118, 293) and not data.is_known(119, 295)
+    # partial half-life uses the branch: 286Fl is 59 % alpha (NUBASE2020)
+    row = [r for r in data.ALPHA_DECAYS if r[:2] == (114, 286)][0]
+    full = __import__("elemental_discovery.nubase", fromlist=["x"]).table()[(114, 286)]["half_life_s"]
+    assert abs(row[3] - full / 0.59) < 1e-9

@@ -30,7 +30,7 @@ def alpha_laws() -> list[dict]:
     """Viola-Seaborg (6 parameters) vs universal decay law (3), forward and LOO."""
     out = []
     for name, f, npar in (("Viola–Seaborg", decay.viola_seaborg_row, 6),
-                          ("Universal decay law (WKB)", _udl_row, 3)):
+                          ("Universal decay law (WKB) + odd hindrance", _udl_row, 4)):
         X, y = zip(*map(f, data.ALPHA_DECAYS))
         law = LinearLaw.fit(X, y)
         fw = [forward_test(f, data.ALPHA_DECAYS, lambda r: r[0], c) for c in ALPHA_CUTS]

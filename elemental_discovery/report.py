@@ -191,17 +191,23 @@ def _section_out_of_sample(w):
     for r in validation.alpha_laws():
         w(f"| {r['law']} | {r['parameters']} | {r['in_sample']:.2f} | {r['loo']:.2f} | "
           + " | ".join(f"{r['forward'][c][0]:.2f}" for c in validation.ALPHA_CUTS) + " |")
-    w("\nErrors are in decades. The three-parameter WKB law describes the data as well as the "
-      "six-parameter Viola–Seaborg form and extrapolates up to three times better, so it is now "
-      "the alpha law used throughout.\n")
+    vs, udl = validation.alpha_laws()
+    w(f"\nErrors are in decades, on {len(data.ALPHA_DECAYS)} NUBASE2020 alpha emitters. The "
+      f"{udl['parameters']}-parameter WKB law (its odd-nucleon hindrance is fitted: "
+      f"+{decay.alpha_law().coef[3]:.2f} decades) describes the data as well as the "
+      f"{vs['parameters']}-parameter Viola–Seaborg form. Its worst forward error is "
+      f"{udl['forward_worst']:.2f} decades against {vs['forward_worst']:.2f}, so it is the alpha "
+      "law used throughout.\n")
     w("| Mass model | Forward Q-alpha rms (MeV) | Forward bias (MeV) | z-rms, GP error only | "
       "z-rms, calibrated | Error growth k (MeV per unit Z–N distance) |")
     w("|---|---|---|---|---|---|")
     for r in validation.mass_model():
         w(f"| {r['hypothesis']} | {r['rms_MeV']:.2f} | {r['bias_MeV']:+.2f} | {r['z_rms_gp_only']:.1f} | "
           f"{r['z_rms_calibrated']:.2f} | {r['k']:.3f} |")
-    w("\nThe GP's own error bars were 2.5–3.5× too small out of sample. With the distance term "
-      "they are calibrated (z-rms ≈ 1).\n")
+    mm = validation.mass_model()
+    lo, hi = min(r["z_rms_gp_only"] for r in mm), max(r["z_rms_gp_only"] for r in mm)
+    w(f"\nThe GP's own error bars are {lo:.1f}–{hi:.1f}× too small out of sample. With the "
+      "distance term they are calibrated (z-rms ≈ 1).\n")
     w("| Fission law | Shell slope k, data only | k with explicit prior N(2.25, 0.75²) | "
       "Shell energies in calibration set (MeV) | Leave-one-out (decades) |")
     w("|---|---|---|---|---|")
@@ -209,16 +215,22 @@ def _section_out_of_sample(w):
         w(f"| {r['hypothesis']} | {r['k_data_only'][0]:+.2f} ± {r['k_data_only'][1]:.2f} | "
           f"{r['k_posterior'][0]:.2f} ± {r['k_posterior'][1]:.2f} | "
           f"{r['shell_energy_range'][0]:.1f} to {r['shell_energy_range'][1]:.1f} | {r['loo']:.1f} |")
-    w("\nFitted freely, the fission data show no measurable stabilisation by shell energy: k is "
-      "consistent with zero. The calibration nuclei have small shell energies, and the island "
-      "(−7 to −11 MeV) lies far outside them. The shell slope is therefore a physics *prior*, now "
-      "stated explicitly. Its consequence is visible in the predictive uncertainty:\n")
+    fl = validation.fission_laws()
+    lo = min(r["shell_energy_range"][0] for r in fl)
+    w(f"\nWith the {len(data.SF_HALF_LIVES)} evaluated NUBASE2020 fission half-lives (odd nuclei "
+      "included, with a fitted odd-nucleon hindrance of "
+      f"{decay.sf_law('Z=114')[0].coef[4]:.1f} ± {decay.sf_law('Z=114')[0].coef_sd()[4]:.1f} decades), "
+      "the data now *measure* the shell slope, and it comes out **below** the range [1, 3.5] that "
+      "v0.1 assumed: shell energy stabilises against fission more weakly than assumed. The prior "
+      "still matters, because the calibration nuclei reach shell energies of only "
+      f"{lo:.1f} MeV while the island lies at −7 to −11 MeV. Its consequence is visible in the "
+      "predictive uncertainty:\n")
     w("| Nucleus | " + " | ".join(f"log10 T_SF, {h} (±1σ)" for h in nuclear.PROTON_HYPOTHESES) + " |")
     w("|---|" + "---|" * len(nuclear.PROTON_HYPOTHESES))
     for r in validation.sf_extrapolation():
         w(f"| {r['nucleus']} | " + " | ".join(f"{r[h][0]:.1f} ± {r[h][1]:.1f}" for h in nuclear.PROTON_HYPOTHESES) + " |")
-    w("\nFission half-lives on the island are uncertain by many decades. The island's location "
-      "follows from the shell prior; its lifetime is not determined by the fission data.\n")
+    w("\nFission half-lives on the island are uncertain by several decades: its lifetime is "
+      "an extrapolation, not a measurement.\n")
 
 
 def _section_calculus(w):
@@ -286,7 +298,7 @@ def build(out_dir: str | Path = "docs") -> Path:
           f"{len(data.ALPHA_DECAYS)} Q-alpha | B: {d['rms_binding_MeV']:.2f} MeV, "
           f"Q-alpha (global): {d['rms_qalpha_MeV']:.2f} MeV |")
     al = decay.alpha_law()
-    w(f"| Alpha half-life (universal decay law, 3 parameters) | {len(data.ALPHA_DECAYS)} alpha emitters | "
+    w(f"| Alpha half-life (universal decay law, {len(al.coef)} parameters) | {len(data.ALPHA_DECAYS)} alpha emitters | "
       f"{al.rms():.2f} decades (leave-one-out {al.loo_rms():.2f}) |")
     for h in nuclear.PROTON_HYPOTHESES:
         law, _ = decay.sf_law(h)
@@ -327,8 +339,12 @@ def build(out_dir: str | Path = "docs") -> Path:
     w(f"\nIn sample, {best_in} fits the superheavy data best. Asked to *predict* heavier nuclei "
       f"before seeing them, {best_fw} does best"
       + (" and the ranking reverses: in-sample fit is not evidence about extrapolation." if best_in != best_fw else ".")
-      + " The weights come from the forward log-likelihood, tempered because nested cuts reuse "
-      "nuclei. They are used to average discovery probabilities (section 6); per-hypothesis "
+      + " Read this as a statement about *this* macroscopic–microscopic model: the variant with its "
+      "shell at 126 extrapolates best. The hypotheses also differ in the shapes of their crude "
+      "shell functions, so this is not evidence that 126 is the true magic number."
+      + " The weights come from the forward log-likelihood, tempered to one effective "
+      "observation per tested element (nested cuts reuse nuclei, and isotopes of one element "
+      "share the model's bias). They are used to average discovery probabilities (section 6); per-hypothesis "
       "results are always shown as well.\n")
 
     # 3. Island
@@ -354,8 +370,8 @@ def build(out_dir: str | Path = "docs") -> Path:
       "element count, is the real frontier. Even with the proton shell placed at 120 or 126, the "
       f"longest lifetimes sit at Z ≈ {min(z_peaks)}–{max(z_peaks)}, because Coulomb repulsion grows "
       "faster than the shell gain. The *location* (N ≈ 184) is robust across hypotheses. The "
-      "*lifetimes* are not: they carry several decades of uncertainty, set mostly by the fission "
-      "shell-slope prior (section 1).\n")
+      "*lifetimes* are not: they carry several decades of uncertainty, because the island's shell "
+      "energies lie far beyond the fission calibration data (section 1).\n")
 
     # 4. Natural occurrence
     w("## 4. Could any of this exist in nature?\n")

@@ -105,3 +105,37 @@ needs: *the probability that a campaign of D days yields k anchored chains*.
 * **Evaporation channel.** One xn channel is chosen per reaction. A one-neutron shift can move a
   chain off the known nuclei (for example 299Uue under Z = 120, which never anchors), so the
   3n/4n mixture should be summed.
+
+## Update (v0.3): evaluated data replace the hand-typed tables
+
+The largest open item above was the data. Masses, half-lives, branching ratios and the list of
+known nuclides now come from **NUBASE2020** (Kondev et al., *Chin. Phys. C* 45, 030001, 2021),
+vendored as an unmodified extract in `elemental_discovery/nubase2020_subset.txt`.
+
+| Dataset | v0.2 (hand-typed) | v0.3 (NUBASE2020) |
+|---|---|---|
+| Alpha emitters | 47 (16 with Z ≥ 104) | 463 (93 with Z ≥ 104) |
+| Fission half-lives | 15, even-even only | 103, odd included |
+| Known nuclides Z ≥ 100 | ranges, gaps ignored (293Og wrongly "known") | exact set of 177 |
+
+What changed, and why it matters:
+
+* **Fission shell slope is now measured, and it is weak.** k = 0.44 ± 0.34 (Z = 114 shells;
+  0.35 ± 0.54 for Z = 126, 1.35 ± 0.71 for Z = 120), against v0.1's assumed [1, 3.5]. The data
+  disfavour the prior centre (2.25) at about 2σ, so fission competes more strongly with alpha
+  decay and fewer chains anchor to known nuclei. Discovery probabilities fall accordingly.
+* **The odd-nucleon fission hindrance is fitted: 1.4 ± 0.4 decades** per odd nucleon type, not
+  the assumed 3. v0.1 gave odd-odd nuclei ~3 decades too much fission stability.
+* **Mass-model weighting.** With 463 Q-alpha rows at 0.15 MeV weight, the binding energies were
+  swamped (rms 2.6 MeV). Weighting Q-alpha by the model's own scatter (0.7 MeV), chosen by
+  forward test, predicts heavier nuclei better (1.27 vs 1.73 MeV) and restores the binding
+  energies (~0.8–0.9 MeV).
+* **Calibration holds.** The forward Q-alpha error falls to 0.75–1.12 MeV (from 1.23–1.82). The
+  uncalibrated GP is still ~2× overconfident; the distance term restores z-rms ≈ 1.
+* **Hypothesis ranking.** The Z = 126 variant now predicts best both in and out of sample. The
+  weights are tempered to one effective observation per tested element, because isotopes of an
+  element share the model's bias.
+
+Still open: AME2020 `rct1` Q-values would give odd-nucleus Q-alpha directly (it was not
+reachable from this environment); fusion cross sections remain hand-compiled; and fission
+still lacks a law that generalises out of sample (≈ 2.4 decades leave-one-out).

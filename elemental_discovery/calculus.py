@@ -168,13 +168,16 @@ class DiscoveryModel:
 def hypothesis_weights(temper: bool = True) -> dict:
     """Weights for the shell hypotheses from their *forward* predictive
     likelihood (how well each predicted heavier nuclei before seeing them).
-    The forward tests reuse nuclei across nested cuts, so the log-likelihood is
-    tempered by (unique test nuclei / total test predictions)."""
+
+    The forward predictions are far from independent: nested cuts reuse the
+    same nuclei, and the isotopes of one element share the model's shell bias.
+    The log-likelihood is therefore tempered to one effective observation per
+    tested element: t = (distinct Z among test nuclei) / (test predictions)."""
     cal = {h: forward_calibration(h) for h in PROTON_HYPOTHESES}
     t = 1.0
     if temper:
-        uniq = sum(1 for z, *_ in data.ALPHA_DECAYS if z >= min(_cuts()))
-        t = uniq / next(iter(cal.values()))["n"]
+        elements = {z for z, *_ in data.ALPHA_DECAYS if z >= min(_cuts())}
+        t = len(elements) / next(iter(cal.values()))["n"]
     ll = np.array([cal[h]["loglik"] * t for h in cal])
     w = np.exp(ll - ll.max())
     return dict(zip(cal, w / w.sum()))

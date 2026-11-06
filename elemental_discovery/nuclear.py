@@ -149,37 +149,67 @@ class MassModel:
         return PROTON_HYPOTHESES[self.hypothesis]
 
     # -- fitting ----------------------------------------------------------
-    def _linear_fit(self, c_shell, kappa, sigma_b, sigma_q):
+    def _design(self, sigma_b, sigma_q):
+        """Everything the fit needs that does not depend on (C, kappa)."""
         pm = self.proton_magic
-
-        def esh(z, n):
-            return shell_and_deformation(z, n, pm, c_shell, kappa)[0]
-
-        rows, targets, weights = [], [], []
+        nuclei, rows, base, w = [], [], [], []
         for z, a, b in self.binding_data:
-            n = a - z
-            rows.append(basis(z, n))
-            targets.append(b + esh(z, n))
-            weights.append(1 / sigma_b)
+            nuclei.append((z, a - z))
+            rows.append(basis(z, a - z))
+            base.append(b)
+            w.append(1 / sigma_b)
+        n_b = len(rows)
         for z, a, q, _ in self.alpha_data:
             n = a - z
             rows.append(basis(z - 2, n - 2) - basis(z, n))
-            targets.append(q - data.B_HE4 + esh(z - 2, n - 2) - esh(z, n))
-            weights.append(1 / sigma_q)
-        w = np.array(weights)
-        X = np.array(rows) * w[:, None]
-        y = np.array(targets) * w
+            base.append(q - data.B_HE4)
+            sq = np.hypot(sigma_q, data.ALPHA_Q_SIGMA.get((z, a), 0.0))
+            w.append(1 / sq)
+        alpha_p = [(z, a - z) for z, a, *_ in self.alpha_data]
+        alpha_d = [(z - 2, a - z - 2) for z, a, *_ in self.alpha_data]
+        allnuc = nuclei + alpha_p + alpha_d
+        sh = np.array([shell_function(z, n, pm) for z, n in allnuc])
+        stiff = np.array([max(1 - fissility(z, n), 0.02) * (z + n) ** (2 / 3) for z, n in allnuc])
+        return n_b, np.array(rows), np.array(base), np.array(w), sh, stiff
+
+    @staticmethod
+    def _esh_vec(sh, stiff, c_shell, kappa):
+        """Vectorised shell_and_deformation over many nuclei."""
+        u = _U_GRID[None, :]
+        s = (c_shell * sh)[:, None]
+        e = s * (1 - 2 * u) * np.exp(-u) + (kappa * stiff)[:, None] * u
+        return e.min(axis=1)
+
+    def _linear_fit(self, design, c_shell, kappa):
+        n_b, rows, base, w, sh, stiff = design
+        e = self._esh_vec(sh, stiff, c_shell, kappa)
+        m = len(base) - n_b
+        e_b, e_p, e_d = e[:n_b], e[n_b:n_b + m], e[n_b + m:]
+        targets = base + np.concatenate([e_b, e_d - e_p])
+        X = rows * w[:, None]
+        y = targets * w
         coeffs, *_ = np.linalg.lstsq(X, y, rcond=None)
         chi2 = float(np.sum((X @ coeffs - y) ** 2))
         return coeffs, chi2
 
-    def fit(self, sigma_b: float = 1.0, sigma_q: float = 0.15) -> "MassModel":
+    def fit(self, sigma_b: float = 1.0, sigma_q: float = 0.7) -> "MassModel":
         """Grid search over the two non-linear shell parameters (C, kappa),
-        linear least squares for the liquid-drop coefficients."""
+        linear least squares for the liquid-drop coefficients.  Each Q-alpha
+        row is weighted by 1/sqrt(sigma_q^2 + extra^2), where extra is the
+        evaluated-data uncertainty of odd nuclei with systematic masses.
+
+        sigma_q defaults to ~the model's own Q-alpha scatter so that 463
+        Q-alpha rows do not swamp 25 binding energies.  Chosen by forward test
+        (fit Z < cut, predict Z >= cut): sigma_q = 0.7 predicts heavier nuclei
+        with 1.27 MeV rms against 1.73 MeV for 0.15, and keeps the binding
+        energies at ~1 MeV.  kappa >= 0.3 keeps the liquid-drop stiffness
+        physical (the data alone push it to the grid edge; forward error is
+        insensitive to it)."""
+        design = self._design(sigma_b, sigma_q)
         best = None
         for c in np.linspace(2.0, 10.0, 33):
-            for kap in np.geomspace(0.05, 5.0, 25):
-                coeffs, chi2 = self._linear_fit(c, kap, sigma_b, sigma_q)
+            for kap in np.geomspace(0.3, 5.0, 25):
+                coeffs, chi2 = self._linear_fit(design, c, kap)
                 if best is None or chi2 < best[0]:
                     best = (chi2, c, kap, coeffs)
         _, self.c_shell, self.kappa, self.coeffs = best
@@ -302,9 +332,10 @@ class ResidualGP:
     error bars.
     """
 
-    def __init__(self, x, r, amp, length, noise):
+    def __init__(self, x, r, amp, length, noise, point_noise=None):
         self.x, self.r, self.amp, self.length, self.noise = x, r, amp, length, noise
-        k = self._k(x, x) + noise**2 * np.eye(len(x))
+        pn = np.full(len(x), noise) if point_noise is None else point_noise
+        k = self._k(x, x) + np.diag(pn**2)
         self.l_chol = np.linalg.cholesky(k)
         self.alpha = np.linalg.solve(self.l_chol.T, np.linalg.solve(self.l_chol, r))
 
@@ -313,9 +344,10 @@ class ResidualGP:
         return self.amp**2 * np.exp(-0.5 * d2 / self.length**2)
 
     @staticmethod
-    def _lml(x, r, amp, length, noise):
-        d2 = ((x[:, None, :] - x[None, :, :]) ** 2).sum(-1)
-        k = amp**2 * np.exp(-0.5 * d2 / length**2) + noise**2 * np.eye(len(x))
+    def _lml(x, r, amp, length, pn, d2=None):
+        if d2 is None:
+            d2 = ((x[:, None, :] - x[None, :, :]) ** 2).sum(-1)
+        k = amp**2 * np.exp(-0.5 * d2 / length**2) + np.diag(pn**2)
         try:
             lc = np.linalg.cholesky(k)
         except np.linalg.LinAlgError:
@@ -329,15 +361,17 @@ class ResidualGP:
         r = np.array(
             [q - model.q_alpha_global(z, a - z) for z, a, q, _ in model.alpha_data]
         )
+        pn = np.hypot(noise, [data.ALPHA_Q_SIGMA.get((z, a), 0.0) for z, a, *_ in model.alpha_data])
+        d2 = ((x[:, None, :] - x[None, :, :]) ** 2).sum(-1)
         best = max(
             (
-                (cls._lml(x, r, amp, ln, noise), amp, ln)
-                for amp in np.linspace(0.2, 1.5, 27)
-                for ln in np.linspace(1.5, 12.0, 43)
+                (cls._lml(x, r, amp, ln, pn, d2), amp, ln)
+                for amp in np.linspace(0.2, 1.5, 14)
+                for ln in np.linspace(1.5, 12.0, 22)
             ),
             key=lambda t: t[0],
         )
-        return cls(x, r, best[1], best[2], noise)
+        return cls(x, r, best[1], best[2], noise, pn)
 
     def predict(self, z: int, n: int) -> tuple[float, float]:
         xs = np.array([[z, n]], float)
@@ -391,7 +425,7 @@ def forward_calibration(hypothesis: str) -> dict:
     log-likelihood of the forward tests -- how well this hypothesis *predicted*
     heavier nuclei before seeing them."""
     key = hashlib.sha1(json.dumps([hypothesis, data.ALPHA_DECAYS, data.BINDING_ENERGIES,
-                                   FORWARD_CUTS, PROTON_HYPOTHESES[hypothesis], 2]).encode()).hexdigest()
+                                   FORWARD_CUTS, PROTON_HYPOTHESES[hypothesis], 4]).encode()).hexdigest()
     if key in _RATE_CACHE:
         return _RATE_CACHE[key]
     f = _CACHE_DIR / "qalpha_extrapolation.json"

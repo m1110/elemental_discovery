@@ -1,15 +1,16 @@
-"""Curated reference data used to calibrate and validate the models.
+"""Reference data used to calibrate and validate the models.
 
-All values were compiled by hand from the evaluated literature (AME2020 /
-NUBASE2020 for masses and decay data; the original discovery papers for the
-superheavy-element cross sections).  Values are rounded and some superheavy
-entries carry real experimental uncertainties of ~0.05-0.1 MeV in Q-alpha and
-tens of percent in half-life.  They are good enough to *calibrate a
-phenomenological model*, not to replace the evaluated tables: check against
-the primary source before quoting any number.
+Nuclear masses, half-lives, branching ratios and the list of known nuclides
+come from the evaluated NUBASE2020 table (see nubase.py for the source and
+for how '#'-flagged superheavy masses are handled).  Fusion cross sections,
+upper limits and K X-ray energies are not in NUBASE; they were compiled by
+hand from the discovery papers and are rounded -- check them against the
+primary sources before quoting any number.
 """
 
 from __future__ import annotations
+
+from . import nubase
 
 SECONDS_PER_YEAR = 3.15576e7
 B_HE4 = 28.2957  # MeV, binding energy of 4He
@@ -17,112 +18,30 @@ B_HE4 = 28.2957  # MeV, binding energy of 4He
 # ---------------------------------------------------------------------------
 # Total nuclear binding energies (MeV), (Z, A, B)
 # ---------------------------------------------------------------------------
-BINDING_ENERGIES = [
-    (20, 40, 342.052),
-    (20, 48, 415.991),
-    (26, 56, 492.254),
-    (28, 58, 506.454),
-    (28, 62, 545.259),
-    (28, 64, 561.756),
-    (38, 88, 768.467),
-    (40, 90, 783.893),
-    (50, 116, 988.680),
-    (50, 120, 1020.546),
-    (50, 132, 1102.851),
-    (56, 138, 1158.293),
-    (62, 144, 1195.730),
-    (79, 197, 1559.400),
-    (80, 200, 1581.180),
-    (82, 208, 1636.430),
-    (83, 209, 1640.230),
-    (88, 226, 1731.610),
-    (90, 232, 1766.690),
-    (92, 235, 1783.870),
-    (92, 238, 1801.690),
-    (94, 239, 1806.920),
-    (94, 244, 1836.060),
-    (96, 248, 1859.200),
-    (98, 252, 1881.270),
+_BINDING_NUCLEI = [
+    (20, 40), (20, 48), (26, 56), (28, 58), (28, 62), (28, 64), (38, 88), (40, 90),
+    (50, 116), (50, 120), (50, 132), (56, 138), (62, 144), (79, 197), (80, 200), (82, 208),
+    (83, 209), (88, 226), (90, 232), (92, 235), (92, 238), (94, 239), (94, 244), (96, 248),
+    (98, 252),
 ]
+BINDING_ENERGIES = [(z, a, nubase.binding_energy_MeV(z, a)) for z, a in _BINDING_NUCLEI]
 
 # ---------------------------------------------------------------------------
-# Alpha decay: (Z, A, Q_alpha [MeV], partial alpha half-life [s])
+# Alpha decay: (Z, A, Q_alpha [MeV], partial alpha half-life [s]), Z >= 84,
+# every NUBASE2020 ground state with a measured half-life and alpha branch.
 # Partial half-life = total half-life / alpha branching ratio.
+# ALPHA_Q_SIGMA holds the extra Q uncertainty of odd nuclei whose masses are
+# systematic (their observed decays feed excited states).
 # ---------------------------------------------------------------------------
-_y = SECONDS_PER_YEAR
-ALPHA_DECAYS = [
-    # even-even
-    (84, 210, 5.407, 1.1956e7),
-    (84, 212, 8.954, 2.99e-7),
-    (84, 214, 7.833, 1.643e-4),
-    (84, 216, 6.906, 0.145),
-    (84, 218, 6.115, 186.0),
-    (86, 220, 6.405, 55.6),
-    (86, 222, 5.590, 3.3035e5),
-    (88, 224, 5.789, 3.14e5),
-    (88, 226, 4.871, 1600 * _y),
-    (90, 226, 6.453, 1836.0),
-    (90, 228, 5.520, 1.912 * _y),
-    (90, 230, 4.770, 7.54e4 * _y),
-    (90, 232, 4.082, 1.40e10 * _y),
-    (92, 234, 4.858, 2.455e5 * _y),
-    (92, 236, 4.573, 2.342e7 * _y),
-    (92, 238, 4.270, 4.468e9 * _y),
-    (94, 238, 5.593, 87.7 * _y),
-    (94, 240, 5.256, 6561 * _y),
-    (94, 242, 4.984, 3.75e5 * _y),
-    (94, 244, 4.666, 8.0e7 * _y),
-    (96, 244, 5.902, 18.1 * _y),
-    (96, 246, 5.475, 4706 * _y),
-    (96, 248, 5.162, 3.48e5 * _y / 0.9161),
-    (98, 250, 6.128, 13.08 * _y / 0.9992),
-    (98, 252, 6.217, 2.645 * _y / 0.969),
-    (100, 250, 7.557, 1800.0),
-    (100, 252, 7.154, 9.14e4),
-    (100, 254, 7.307, 11664.0),
-    (102, 252, 8.549, 2.44 / 0.73),
-    (102, 254, 8.226, 51.0 / 0.90),
-    (114, 286, 10.37, 0.12 / 0.5),
-    (114, 288, 10.07, 0.66),
-    (116, 290, 11.00, 8.3e-3),
-    (116, 292, 10.77, 1.6e-2),
-    (118, 294, 11.82, 6.9e-4),
-    # odd-A / odd-odd
-    (92, 235, 4.679, 7.04e8 * _y),
-    (94, 239, 5.245, 24110 * _y),
-    (95, 241, 5.638, 432.2 * _y),
-    (112, 283, 9.67, 4.0),
-    (112, 285, 9.32, 28.0),
-    (114, 287, 10.17, 0.48),
-    (114, 289, 9.97, 2.1),
-    (115, 288, 10.61, 0.19),
-    (116, 293, 10.68, 5.7e-2),
-    (111, 280, 9.89, 4.6),
-    (109, 276, 9.85, 0.6),
-    (107, 272, 9.15, 9.8),
-]
+_ALPHA = nubase.alpha_decays(84)
+ALPHA_DECAYS = [r[:4] for r in _ALPHA]
+ALPHA_Q_SIGMA = {(r[0], r[1]): r[4] for r in _ALPHA}
 
 # ---------------------------------------------------------------------------
-# Spontaneous fission: (Z, A, partial SF half-life [s]), even-even only
+# Spontaneous fission: (Z, A, partial SF half-life [s]), Z >= 90, every
+# NUBASE2020 ground state with a measured half-life and a numeric SF branch.
 # ---------------------------------------------------------------------------
-SF_HALF_LIVES = [
-    (92, 238, 8.2e15 * _y),
-    (94, 240, 1.14e11 * _y),
-    (94, 242, 6.77e10 * _y),
-    (96, 244, 1.32e7 * _y),
-    (96, 248, 4.15e6 * _y),
-    (98, 250, 1.7e4 * _y),
-    (98, 252, 85.7 * _y),
-    (98, 254, 5.23e6),
-    (100, 256, 1.12e4),
-    (100, 258, 3.7e-4),
-    (102, 252, 9.0),
-    (104, 256, 6.6e-3),
-    (106, 260, 1.7e-2),
-    (112, 282, 8.0e-4),
-    (112, 284, 0.10),
-    (114, 286, 0.24),
-]
+SF_HALF_LIVES = nubase.sf_half_lives(90)
 
 # ---------------------------------------------------------------------------
 # Measured maximum evaporation-residue cross sections for hot fusion (pb).
@@ -180,12 +99,11 @@ SYMBOLS = (
     "Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og"
 ).split()
 
-KNOWN_ISOTOPES = {  # Z: (A_min, A_max), approximate, gaps ignored
-    100: (241, 260), 101: (244, 262), 102: (248, 264), 103: (251, 266),
-    104: (252, 268), 105: (255, 270), 106: (257, 271), 107: (260, 274),
-    108: (263, 277), 109: (265, 278), 110: (267, 281), 111: (272, 282),
-    112: (276, 285), 113: (278, 286), 114: (284, 290), 115: (286, 290),
-    116: (288, 293), 117: (293, 294), 118: (293, 294),
+# Nuclides with Z >= 100 whose half-life has been measured (NUBASE2020).
+KNOWN_NUCLIDES = nubase.known_nuclides(100)
+KNOWN_ISOTOPES = {  # Z: (A_min, A_max), for display only -- use is_known()
+    z: (min(a for zz, a in KNOWN_NUCLIDES if zz == z), max(a for zz, a in KNOWN_NUCLIDES if zz == z))
+    for z in sorted({z for z, _ in KNOWN_NUCLIDES})
 }
 
 
@@ -201,5 +119,4 @@ def symbol(z: int) -> str:
 def is_known(z: int, a: int) -> bool:
     if z < 100:
         return True  # treat the whole sub-fermium chart as charted territory
-    rng = KNOWN_ISOTOPES.get(z)
-    return bool(rng) and rng[0] <= a <= rng[1]
+    return (z, a) in KNOWN_NUCLIDES
