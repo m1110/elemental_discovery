@@ -50,39 +50,121 @@ def coulomb_barrier(zp, ap, zt, at) -> float:
     return 1.44 * zp * zt / r
 
 
-@lru_cache(maxsize=1)
-def cross_section_fit():
-    """log10 sigma(pb) = c0 + c1 * x_m, by censored (Tobit) maximum likelihood.
+# ---------------------------------------------------------------------------
+# Cross-section law: log10 sigma(pb) = c0 + c1 x_m + eps,  eps ~ N(0, s^2).
+#
+# Measured cross sections are Gaussian points in log10 sigma.  A published
+# non-observation is NOT a censored Gaussian point: it is a Poisson count of
+# zero at a known exposure.  A 90 % CL limit sigma_lim means an integrated
+# exposure L = ln(10) / sigma_lim, and the probability of seeing nothing is
+#     P(0 | c, s) = E_eps[ exp(-L 10^(c0 + c1 x + eps)) ].
+# This is the exact likelihood, and it is harsher on over-predictions than the
+# censored-Gaussian (Tobit) treatment: a true cross section equal to the limit
+# still gives zero events 10 % of the time, twice the limit only 1 %.
+#
+# The posterior over (c0, c1, s) is kept on a grid (flat priors), so the
+# predictive distribution of any reaction includes parameter uncertainty and
+# grows away from the calibration data.
+# ---------------------------------------------------------------------------
+from .linear import _GH_W, _GH_X  # noqa: E402
 
-    Measured cross sections enter as Gaussian points in log10 sigma; published
-    non-observations enter as upper limits through the normal CDF, so the
-    failed searches for 119/120 genuinely constrain the extrapolation.
-    Returns ((c0, c1), scatter sigma in log10).
-    """
+LIMIT_CL = 0.90
+
+
+def exposure_from_limit(limit_pb: float, cl: float = LIMIT_CL) -> float:
+    """Integrated exposure (1/pb) implied by a zero-event upper limit."""
+    return -math.log(1 - cl) / limit_pb
+
+
+def _grid(limits):
     x = np.array([effective_fissility(*r[:4]) for r in data.CROSS_SECTIONS])
     y = np.log10([r[4] for r in data.CROSS_SECTIONS])
-    xl = np.array([effective_fissility(*r[:4]) for r in data.CROSS_SECTION_LIMITS])
-    yl = np.log10([r[4] for r in data.CROSS_SECTION_LIMITS])
-
-    c1 = np.linspace(-40, -5, 141)[:, None, None]
-    off = np.linspace(-1.5, 1.5, 61)[None, :, None]
-    sig = np.linspace(0.15, 0.8, 27)[None, None, :]
+    c1 = np.linspace(-45, 0, 181)[:, None, None]
+    off = np.linspace(-1.2, 1.2, 49)[None, :, None]
+    s = np.linspace(0.12, 1.0, 45)[None, None, :]
     c0 = y.mean() - c1 * x.mean() + off
     pred = c0[..., None] + c1[..., None] * x
-    r = (y - pred) / sig[..., None]
-    ll = -0.5 * (r * r).sum(-1) - len(y) * np.log(sig)
-    pl = c0[..., None] + c1[..., None] * xl
-    t = (yl - pl) / (sig[..., None] * math.sqrt(2))
-    cdf = 0.5 * (1 + np.vectorize(math.erf)(t))
-    ll = ll + np.log(np.maximum(cdf, 1e-300)).sum(-1)
-    i, j, k = np.unravel_index(np.argmax(ll), ll.shape)
-    c0b = float(np.broadcast_to(c0, ll.shape)[i, j, k])
-    return (c0b, float(c1[i, 0, 0])), float(sig[0, 0, k])
+    ll = -0.5 * (((y - pred) / s[..., None]) ** 2).sum(-1) - len(y) * np.log(s)
+    for zp, ap, zt, at, lim, _ in limits:
+        xl = effective_fissility(zp, ap, zt, at)
+        lg = (c0 + c1 * xl)[..., None] + s[..., None] * _GH_X
+        p0 = (np.exp(-exposure_from_limit(lim) * 10.0 ** lg) * _GH_W).sum(-1)
+        ll = ll + np.log(np.maximum(p0, 1e-300))
+    w = np.exp(ll - ll.max())
+    w /= w.sum()
+    shape = w.shape
+    return (np.broadcast_to(c0, shape).ravel(), np.broadcast_to(c1, shape).ravel(),
+            np.broadcast_to(s, shape).ravel(), w.ravel())
+
+
+@lru_cache(maxsize=8)
+def cross_section_posterior(exclude: str | None = None):
+    """Grid posterior (c0, c1, s, weight), optionally leaving one limit out."""
+    lims = [r for r in data.CROSS_SECTION_LIMITS if r[5] != exclude]
+    c0, c1, s, w = _grid(lims)
+    # Keep the highest-weight grid points holding 99.99 % of the mass.
+    order = np.argsort(w)[::-1]
+    n = int(np.searchsorted(np.cumsum(w[order]), 0.9999)) + 1
+    keep = order[:n]
+    return c0[keep], c1[keep], s[keep], w[keep] / w[keep].sum()
+
+
+@lru_cache(maxsize=1)
+def cross_section_fit():
+    """Posterior means ((c0, c1), s), back-compatible with the old interface."""
+    c0, c1, s, w = cross_section_posterior()
+    return (float(w @ c0), float(w @ c1)), float(w @ s)
+
+
+def predictive_log10_sigma(zp, ap, zt, at, exclude=None):
+    """Mixture-of-normals predictive distribution: (means, sds, weights)."""
+    c0, c1, s, w = cross_section_posterior(exclude)
+    return c0 + c1 * effective_fissility(zp, ap, zt, at), s, w
 
 
 def log10_sigma_pb(zp, ap, zt, at) -> tuple[float, float]:
-    (c0, c1), sig = cross_section_fit()
-    return c0 + c1 * effective_fissility(zp, ap, zt, at), sig
+    """(mean, predictive sd) of log10 sigma[pb], parameter uncertainty included."""
+    m, s, w = predictive_log10_sigma(zp, ap, zt, at)
+    mean = float(w @ m)
+    return mean, float(np.sqrt(w @ (s**2 + (m - mean) ** 2)))
+
+
+def past_exposure(zp, ap, zt, at) -> float:
+    """Integrated exposure (1/pb) already spent on this exact reaction without
+    a single event (from the published limits)."""
+    return sum(exposure_from_limit(r[4]) for r in data.CROSS_SECTION_LIMITS if r[:4] == (zp, ap, zt, at))
+
+
+@lru_cache(maxsize=64)
+def log10_sigma_samples(zp, ap, zt, at, condition_on_nulls: bool = True):
+    """Weighted samples (log10 sigma_pb, weight) of this reaction's cross section.
+
+    With condition_on_nulls the reaction's own idiosyncratic deviation eps is
+    updated by its past zero-event exposure (exact hierarchical Bayes: the
+    global parameters already saw that limit, so only eps is re-weighted).
+    """
+    m, s, w = predictive_log10_sigma(zp, ap, zt, at)
+    # Collapse the mixture onto a fixed grid in log10 sigma.
+    mean = float(w @ m)
+    sd = float(np.sqrt(w @ (s**2 + (m - mean) ** 2)))
+    y = np.linspace(mean - 7 * sd, mean + 7 * sd, 281)
+    dens = np.zeros_like(y)
+    for i in range(0, len(m), 4096):
+        mm, ss, ww_ = m[i:i + 4096, None], s[i:i + 4096, None], w[i:i + 4096, None]
+        dens += (ww_ / ss * np.exp(-0.5 * ((y[None, :] - mm) / ss) ** 2)).sum(0)
+    L = past_exposure(zp, ap, zt, at) if condition_on_nulls else 0.0
+    if L > 0:
+        # Exact hierarchical update: the global parameters already saw this
+        # limit, so only the reaction's own deviation is re-weighted, i.e.
+        # p(y | all) ~ sum_g w_g N(y; m_g, s_g) P0(y) / P0_g.
+        p0g = (np.exp(-L * 10.0 ** (m[:, None] + s[:, None] * _GH_X[None, :])) @ _GH_W)
+        dens = np.zeros_like(y)
+        for i in range(0, len(m), 4096):
+            mm, ss = m[i:i + 4096, None], s[i:i + 4096, None]
+            ww_ = (w[i:i + 4096] / np.maximum(p0g[i:i + 4096], 1e-300))[:, None]
+            dens += (ww_ / ss * np.exp(-0.5 * ((y[None, :] - mm) / ss) ** 2)).sum(0)
+        dens *= np.exp(-L * 10.0**y)
+    return y, dens / dens.sum()
 
 
 @dataclass
@@ -176,14 +258,21 @@ def candidate_reactions(z_new: int, hypothesis: str = "Z=114") -> list[Reaction]
 
 
 def validate_against_limits() -> list[dict]:
-    """Compare predicted cross sections with published non-observations."""
+    """Leave-one-out predictive check of every published non-observation:
+    refit without that search, then ask how probable zero events were."""
     rows = []
     for zp, ap, zt, at, limit, label in data.CROSS_SECTION_LIMITS:
-        lg, rms = log10_sigma_pb(zp, ap, zt, at)
+        m, s, w = predictive_log10_sigma(zp, ap, zt, at, exclude=label)
+        mean = float(w @ m)
+        L = exposure_from_limit(limit)
+        lg = m[:, None] + s[:, None] * _GH_X[None, :]
+        p0 = float(w @ (np.exp(-L * 10.0**lg) @ _GH_W))
         rows.append({
             "reaction": label,
-            "predicted_pb": 10**lg,
+            "predicted_pb": 10**mean,
             "upper_limit_pb": limit,
-            "within_1_sigma": bool(10**lg <= limit * 10**rms),
+            "expected_events": L * float(w @ (10.0 ** lg @ _GH_W)),
+            "p_zero_events": p0,
+            "within_1_sigma": bool(p0 > 0.1587),
         })
     return rows

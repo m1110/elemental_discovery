@@ -4,6 +4,7 @@
     python -m elemental_discovery nucleus Z A [--hypothesis Z=120]
     python -m elemental_discovery element Z
     python -m elemental_discovery reactions Z
+    python -m elemental_discovery discover Z [--days 300] [--chains 3]
 """
 
 from __future__ import annotations
@@ -30,6 +31,11 @@ def main(argv=None):
     x = sub.add_parser("reactions", help="fusion reactions that could make element Z")
     x.add_argument("z", type=int)
     x.add_argument("--beam-pua", type=float, default=6.0)
+    d = sub.add_parser("discover", help="probability of discovering element Z (discovery calculus)")
+    d.add_argument("z", type=int)
+    d.add_argument("--days", type=float, default=300.0)
+    d.add_argument("--chains", type=int, default=3)
+    d.add_argument("--beam-pua", type=float, default=6.0)
     args = ap.parse_args(argv)
 
     if args.cmd == "report":
@@ -51,6 +57,23 @@ def main(argv=None):
             print(f"{rx.label:22s} -> {zr + nr}{data.symbol(zr)} ({rx.best_xn()}n)  "
                   f"E*={rx.e_star_at_barrier():5.1f} MeV  sigma={10**lg * 1000:7.1f} fb (x{10**sig:.1f})  "
                   f"days for 3 chains: {beam_days(epd, 3, 0.9):6.0f}")
+    elif args.cmd == "discover":
+        _discover(args)
+
+
+def _discover(args):
+    from .calculus import Setup, discovery_table, hypothesis_weights
+    setup = Setup(beam_pua=args.beam_pua, chains_needed=args.chains)
+    w = hypothesis_weights()
+    print("hypothesis weights (forward predictive likelihood): "
+          + ", ".join(f"{h} {v:.2f}" for h, v in w.items()))
+    for r in discovery_table((args.z,), setup=setup, campaign_days=args.days, per_z=9):
+        ph = "  ".join(f"{h} {v:.2f}" for h, v in r["p_discovery"].items())
+        d50 = r["days_50pc_Z114"]
+        print(f"{r['reaction']:16s} -> {r['residue']:8s} sigma~{r['sigma_median_fb']:6.1f} fb"
+              f"{' (null searched)' if r['past_null_exposure'] else '':16s}"
+              f" P(>= {args.chains} anchored chains in {args.days:.0f} d): {ph}  weighted {r['p_discovery_avg']:.2f}"
+              f"  | days to 50% (Z=114): {'never' if d50 == float('inf') else f'{d50:.0f}'}")
 
 
 if __name__ == "__main__":

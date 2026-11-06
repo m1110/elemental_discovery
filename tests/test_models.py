@@ -144,3 +144,108 @@ def test_island_lies_near_n184():
     for h in HYPS:
         peak, _ = survey.island_of_stability(h)
         assert 178 <= peak["N"] <= 186
+
+
+# --------------------------------------------------------------- linear laws
+def test_linear_law_predictive_sd_grows_with_extrapolation():
+    from elemental_discovery.linear import LinearLaw
+    rng = np.random.default_rng(0)
+    x = rng.uniform(0, 1, 40)
+    X = np.column_stack([np.ones_like(x), x])
+    law = LinearLaw.fit(X, 2 + 3 * x + rng.normal(0, 0.1, 40))
+    assert abs(law.coef[1] - 3) < 0.2
+    assert law.sd([1, 0.5]) < law.sd([1, 3.0]) < law.sd([1, 10.0])
+    # closed-form leave-one-out equals brute force
+    brute = []
+    for i in range(len(x)):
+        m = np.ones(len(x), bool)
+        m[i] = False
+        c, *_ = np.linalg.lstsq(X[m], law.y[m], rcond=None)
+        brute.append(X[i] @ c - law.y[i])
+    assert np.allclose(law.loo_residuals(), brute)
+
+
+def test_prior_pulls_unconstrained_coefficient():
+    from elemental_discovery.linear import LinearLaw
+    X = np.column_stack([np.ones(10), np.linspace(0, 1, 10), np.zeros(10)])  # 3rd unconstrained
+    y = np.linspace(0, 1, 10) + np.random.default_rng(1).normal(0, 0.05, 10)
+    law = LinearLaw.fit(X, y, prior_mean=[0, 0, 5.0], prior_sd=[np.inf, np.inf, 1.0])
+    assert abs(law.coef[2] - 5.0) < 1e-6 and abs(law.coef_sd()[2] - 1.0) < 1e-6  # prior returned
+
+
+# --------------------------------------------------------------- out of sample
+def test_wkb_alpha_law_extrapolates_better_than_viola_seaborg():
+    from elemental_discovery import validation
+    vs, udl = validation.alpha_laws()
+    assert udl["parameters"] < vs["parameters"]
+    assert udl["forward_worst"] < vs["forward_worst"]
+
+
+@pytest.mark.parametrize("h", HYPS)
+def test_qalpha_errors_are_calibrated_out_of_sample(h):
+    cal = nuclear.forward_calibration(h)
+    assert cal["z_rms_gp_only"] > 2.0  # the uncalibrated GP was overconfident
+    assert 0.8 < cal["z_rms_calibrated"] < 1.3
+
+
+def test_qalpha_error_grows_with_distance():
+    m = nuclear.get_model("Z=114")
+    s = [m.q_alpha_with_uncertainty(z, n)[1] for z, n in ((118, 176), (120, 178), (122, 180), (126, 184))]
+    assert s == sorted(s) and s[-1] > 3 * s[0]
+
+
+def test_fission_shell_slope_is_prior_dominated():
+    free, _ = decay.sf_law("Z=114", prior=False)
+    post, _ = decay.sf_law("Z=114")
+    assert abs(free.coef[3]) < 2 * free.coef_sd()[3]  # data alone: consistent with zero
+    assert post.coef_sd()[3] < free.coef_sd()[3]
+    m = nuclear.get_model("Z=114")
+    _, sd_known = decay.log10_t_sf_with_sd(m, 112, 172)
+    _, sd_island = decay.log10_t_sf_with_sd(m, 114, 184)
+    assert sd_island > 2 * sd_known
+
+
+# --------------------------------------------------------------- Poisson exposure
+def test_exposure_from_limit():
+    # 90 % CL with zero events <=> 2.303 expected events at the limit
+    assert abs(production.exposure_from_limit(1.0) - math.log(10)) < 1e-12
+
+
+def test_null_search_lowers_that_reaction_only():
+    y, w = production.log10_sigma_samples(22, 50, 97, 249)  # searched at GSI, 0 events
+    y0, w0 = production.log10_sigma_samples(22, 50, 97, 249, condition_on_nulls=False)
+    assert w @ y < w0 @ y0 - 0.3
+    y, w = production.log10_sigma_samples(23, 51, 96, 248)  # never searched
+    y0, w0 = production.log10_sigma_samples(23, 51, 96, 248, condition_on_nulls=False)
+    assert abs(w @ y - w0 @ y0) < 1e-9
+
+
+# --------------------------------------------------------------- discovery calculus
+def test_flight_survival_is_below_point_estimate():
+    from elemental_discovery.calculus import flight_survival
+    point = 2 ** -1.0  # T = t_flight exactly
+    assert flight_survival(-6.0, 1.0, 1e-6) < point
+    assert abs(flight_survival(-6.0, 1e-6, 1e-6) - point) < 1e-6
+
+
+def test_discovery_probability_is_sane():
+    from elemental_discovery.calculus import DiscoveryModel, Setup
+    r = production.Reaction(22, 50, 98, 251, "251Cf")
+    dm = DiscoveryModel(r, "Z=114", Setup())
+    ps = [dm.p_discovery(d) for d in (1, 30, 300, 3000)]
+    assert ps == sorted(ps) and 0 <= ps[0] < ps[-1] <= dm.p_anchor <= 1
+    d = dm.days_for(0.3)
+    assert abs(dm.p_discovery(d) - 0.3) < 1e-3
+
+
+def test_einsteinium_routes_are_target_limited():
+    from elemental_discovery.calculus import DiscoveryModel, Setup
+    es = DiscoveryModel(production.Reaction(20, 48, 99, 254, "254Es"), "Z=114", Setup())
+    bk = DiscoveryModel(production.Reaction(22, 50, 97, 249, "249Bk"), "Z=114", Setup())
+    assert es.per_pb_day < bk.per_pb_day / 100
+
+
+def test_hypothesis_weights_normalised():
+    from elemental_discovery.calculus import hypothesis_weights
+    w = hypothesis_weights()
+    assert abs(sum(w.values()) - 1) < 1e-12 and all(v > 0 for v in w.values())

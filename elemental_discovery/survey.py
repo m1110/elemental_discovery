@@ -96,8 +96,14 @@ def rank_new_elements(z_values=(119, 120, 121, 122), hypothesis: str = "Z=114",
             zr, nr = r.residue()
             chain, ending = decay_chain(zr, nr, hypothesis)
             lg, sig = r.sigma_pb()
-            survive = 2 ** (-SEPARATOR_FLIGHT_TIME_S / chain[0].half_life)
-            epd = r.events_per_day(beam_pua, target_mg_cm2) * survive
+            # Average the flight survival over the half-life uncertainty (the
+            # survival at the central half-life is biased high), and respect
+            # targets that only exist in microgram quantities.
+            from .calculus import Setup, flight_survival, target_density
+            survive = flight_survival(chain[0].log_t_total, chain[0].log_t_total_sigma,
+                                      SEPARATOR_FLIGHT_TIME_S)
+            tgt = target_density(r, Setup(default_target_mg_cm2=target_mg_cm2))
+            epd = r.events_per_day(beam_pua, tgt) * survive
             rows.append({
                 "Z": z,
                 "reaction": r.label,

@@ -7,7 +7,7 @@ import math
 
 import numpy as np
 
-from . import atomic, data, decay, nuclear, production, survey
+from . import atomic, calculus, data, decay, nuclear, production, survey, validation
 from .confirmation import confirmation_plan, significance
 
 # Reference palette (light mode) from the dataviz guidance.
@@ -70,11 +70,18 @@ def fig_cross_sections(out: Path):
 
     _style(plt)
     fig, ax = plt.subplots(figsize=(8.5, 5.2), constrained_layout=True)
-    (c0, c1), sig = production.cross_section_fit()
+    c0, c1, s_, wt = production.cross_section_posterior()
     xs = np.linspace(0.76, 0.92, 100)
-    ys = c0 + c1 * xs
-    ax.fill_between(xs, 10 ** (ys - sig) * 1000, 10 ** (ys + sig) * 1000, color=SEQ[0], lw=0)
-    ax.plot(xs, 10**ys * 1000, color=SEQ[4], lw=2, label="Censored-likelihood fit (±1σ band)")
+    ys, sds = [], []
+    for x in xs:
+        m = c0 + c1 * x
+        mu = float(wt @ m)
+        ys.append(mu)
+        sds.append(float(np.sqrt(wt @ (s_**2 + (m - mu) ** 2))))
+    ys, sds = np.array(ys), np.array(sds)
+    ax.fill_between(xs, 10 ** (ys - sds) * 1000, 10 ** (ys + sds) * 1000, color=SEQ[0], lw=0)
+    ax.plot(xs, 10**ys * 1000, color=SEQ[4], lw=2,
+            label="Poisson-exposure fit (±1σ predictive band)")
     for zp, ap, zt, at, s, lab in data.CROSS_SECTIONS:
         ax.plot(production.effective_fissility(zp, ap, zt, at), s * 1000, "o", ms=8,
                 color=INK, markeredgecolor=SURFACE, markeredgewidth=1.5)
@@ -160,6 +167,104 @@ def _fmt_t(logt: float) -> str:
     return f"{t:.2g} s"
 
 
+def _one_sided_sigma(p: float) -> float:
+    from .confirmation import gaussian_sigma
+    return gaussian_sigma(min(max(p, 1e-300), 0.5))
+
+
+def _peak_sf_sd() -> float:
+    sds = []
+    for h in nuclear.PROTON_HYPOTHESES:
+        peak, _ = survey.island_of_stability(h)
+        sds.append(decay.predict(peak["Z"], peak["N"], h).log_t_sigma["SF"])
+    return max(sds)
+
+
+def _section_out_of_sample(w):
+    w("### Out-of-sample checks: fit the past, predict the future\n")
+    w("Discovery history provides the test: fit on everything lighter than a cut in Z, predict "
+      "everything heavier, and compare the errors with the claimed error bars. A calibrated "
+      "model has forward z-scores with rms ≈ 1.\n")
+    w("| Alpha half-life law | Parameters | In sample | Leave-one-out | "
+      + " | ".join(f"Forward, fit Z<{c}" for c in validation.ALPHA_CUTS) + " |")
+    w("|---|---|---|---|" + "---|" * len(validation.ALPHA_CUTS))
+    for r in validation.alpha_laws():
+        w(f"| {r['law']} | {r['parameters']} | {r['in_sample']:.2f} | {r['loo']:.2f} | "
+          + " | ".join(f"{r['forward'][c][0]:.2f}" for c in validation.ALPHA_CUTS) + " |")
+    w("\nErrors are in decades. The three-parameter WKB law describes the data as well as the "
+      "six-parameter Viola–Seaborg form and extrapolates up to three times better, so it is now "
+      "the alpha law used throughout.\n")
+    w("| Mass model | Forward Q-alpha rms (MeV) | Forward bias (MeV) | z-rms, GP error only | "
+      "z-rms, calibrated | Error growth k (MeV per unit Z–N distance) |")
+    w("|---|---|---|---|---|---|")
+    for r in validation.mass_model():
+        w(f"| {r['hypothesis']} | {r['rms_MeV']:.2f} | {r['bias_MeV']:+.2f} | {r['z_rms_gp_only']:.1f} | "
+          f"{r['z_rms_calibrated']:.2f} | {r['k']:.3f} |")
+    w("\nThe GP's own error bars were 2.5–3.5× too small out of sample. With the distance term "
+      "they are calibrated (z-rms ≈ 1).\n")
+    w("| Fission law | Shell slope k, data only | k with explicit prior N(2.25, 0.75²) | "
+      "Shell energies in calibration set (MeV) | Leave-one-out (decades) |")
+    w("|---|---|---|---|---|")
+    for r in validation.fission_laws():
+        w(f"| {r['hypothesis']} | {r['k_data_only'][0]:+.2f} ± {r['k_data_only'][1]:.2f} | "
+          f"{r['k_posterior'][0]:.2f} ± {r['k_posterior'][1]:.2f} | "
+          f"{r['shell_energy_range'][0]:.1f} to {r['shell_energy_range'][1]:.1f} | {r['loo']:.1f} |")
+    w("\nFitted freely, the fission data show no measurable stabilisation by shell energy: k is "
+      "consistent with zero. The calibration nuclei have small shell energies, and the island "
+      "(−7 to −11 MeV) lies far outside them. The shell slope is therefore a physics *prior*, now "
+      "stated explicitly. Its consequence is visible in the predictive uncertainty:\n")
+    w("| Nucleus | " + " | ".join(f"log10 T_SF, {h} (±1σ)" for h in nuclear.PROTON_HYPOTHESES) + " |")
+    w("|---|" + "---|" * len(nuclear.PROTON_HYPOTHESES))
+    for r in validation.sf_extrapolation():
+        w(f"| {r['nucleus']} | " + " | ".join(f"{r[h][0]:.1f} ± {r[h][1]:.1f}" for h in nuclear.PROTON_HYPOTHESES) + " |")
+    w("\nFission half-lives on the island are uncertain by many decades. The island's location "
+      "follows from the shell prior; its lifetime is not determined by the fission data.\n")
+
+
+def _section_calculus(w):
+    setup = calculus.Setup()
+    days = 300
+    rows = calculus.discovery_table(campaign_days=days, setup=setup)
+    w("## 6. How likely is a discovery? (the discovery calculus)\n")
+    w("Point estimates of \"beam days\" are biased in the optimistic direction. The cross section is "
+      "log-normal, so its mean exceeds its median. The half-life is uncertain, so the fraction of "
+      "atoms that survive the flight is lower than at the central value. And under the IUPAC "
+      "criteria a chain counts only if it is anchored to known nuclei. The calculus carries all "
+      "three into one number:\n")
+    w("```")
+    w("P_disc(D) = P_anchor · E_{σ,T}[ P_Poisson(≥ k ; λ(σ,T)·D) ]")
+    w("λ        = σ · I_beam · n_target · ε · 2^(−t_flight/T)")
+    w("P_anchor = Π_unknown links Φ( (log T_SF − log T_α) / √(sd_SF² + sd_α²) )")
+    w("```\n")
+    w("log σ has the posterior predictive distribution of the cross-section law, conditioned on "
+      "any zero-event exposure already spent on that reaction. log T is normal with the decay "
+      "laws' predictive sd. The expectation is evaluated by Gauss–Hermite quadrature.\n")
+    w(f"Campaign: {days} beam days, k = {setup.chains_needed} anchored chains, "
+      f"{setup.beam_pua:g} pµA, {setup.efficiency:.0%} efficiency, {setup.flight_time_s * 1e6:g} µs flight.\n")
+    hs = list(nuclear.PROTON_HYPOTHESES)
+    w("| Z | Reaction | Residue | σ median (fb) | Already searched? | Survive flight (Z=114) | "
+      "P_anchor " + "/".join(h[2:] for h in hs) + " | P_disc " + "/".join(h[2:] for h in hs)
+      + " | P_disc, weighted | Days to 50 % (Z=114) |")
+    w("|---|---|---|---|---|---|---|---|---|---|")
+    for r in rows:
+        d50 = r["days_50pc_Z114"]
+        w(f"| {r['Z']} | {r['reaction']} | {r['residue']} | {r['sigma_median_fb']:.0f} | "
+          f"{'yes, 0 events' if r['past_null_exposure'] else 'no'} | {r['survival']['Z=114']:.0%} | "
+          + "/".join(f"{r['p_anchor'][h]:.2f}" for h in hs) + " | "
+          + "/".join(f"{r['p_discovery'][h]:.2f}" for h in hs)
+          + f" | **{r['p_discovery_avg']:.2f}** | {'never' if not math.isfinite(d50) else f'{d50:.0f}'} |")
+    best = {}
+    for r in rows:
+        if r["Z"] not in best or r["p_discovery_avg"] > best[r["Z"]]["p_discovery_avg"]:
+            best[r["Z"]] = r
+    w("\nBest route per element, by the weighted discovery probability in one campaign: "
+      + "; ".join(f"Z={z}: {r['reaction']} ({r['p_discovery_avg']:.0%})" for z, r in best.items()) + ".\n")
+    w("\"Never\" means that even unlimited beam time cannot reach 50 %: with the probability left "
+      "after flight losses and the chance that the chain fails to anchor, discovery stays below "
+      "even odds. Reactions already searched without success are penalised exactly once, through "
+      "their own exposure. Einsteinium routes are limited by the target, not the physics.\n")
+
+
 def build(out_dir: str | Path = "docs") -> Path:
     out = Path(out_dir)
     (out / "figures").mkdir(parents=True, exist_ok=True)
@@ -180,22 +285,27 @@ def build(out_dir: str | Path = "docs") -> Path:
         w(f"| Mass model, shell at {h} | {len(data.BINDING_ENERGIES)} binding energies + "
           f"{len(data.ALPHA_DECAYS)} Q-alpha | B: {d['rms_binding_MeV']:.2f} MeV, "
           f"Q-alpha (global): {d['rms_qalpha_MeV']:.2f} MeV |")
-    _, rms_a = decay.viola_seaborg_fit()
-    w(f"| Alpha half-life (Viola–Seaborg, refitted) | {len(data.ALPHA_DECAYS)} alpha emitters | "
-      f"{rms_a:.2f} decades |")
+    al = decay.alpha_law()
+    w(f"| Alpha half-life (universal decay law, 3 parameters) | {len(data.ALPHA_DECAYS)} alpha emitters | "
+      f"{al.rms():.2f} decades (leave-one-out {al.loo_rms():.2f}) |")
     for h in nuclear.PROTON_HYPOTHESES:
+        law, _ = decay.sf_law(h)
         w(f"| Fission half-life, {h} | {len(data.SF_HALF_LIVES) - 1} SF emitters | "
-          f"{decay.sf_fit(h)[1]:.1f} decades |")
+          f"{law.rms():.1f} decades (leave-one-out {law.loo_rms():.1f}) |")
     (c0, c1), sig = production.cross_section_fit()
     w(f"| Fusion cross section | {len(data.CROSS_SECTIONS)} measured + "
-      f"{len(data.CROSS_SECTION_LIMITS)} upper limits (censored fit) | ×{10**sig:.1f} |")
+      f"{len(data.CROSS_SECTION_LIMITS)} zero-event searches (Poisson likelihood) | ×{10**sig:.1f} |")
     s1, s2, kerr = atomic.kalpha_screening()
     w(f"| K-alpha1 X-ray energy (Dirac, finite nucleus) | {len(data.K_ALPHA1)} elements | "
       f"{100 * kerr:.2f} % |")
     w("")
     w("A Gaussian-process correction trained on the Q-alpha residuals pulls predictions onto the "
-      "data near measured nuclei; far from data it relaxes to the global model and the uncertainty "
-      "grows. That growth is the point: it shows where we are extrapolating.\n")
+      "data near measured nuclei; far from data it relaxes to the global model. A stationary GP's "
+      "error stops growing at its amplitude, so a term proportional to the distance from the "
+      "nearest measured nucleus is added in quadrature, with its slope calibrated on forward tests "
+      "(next section). Every other law reports its regression *predictive* standard deviation, "
+      "which also grows as it extrapolates.\n")
+    _section_out_of_sample(w)
 
     # 2. Hypotheses
     w("## 2. Where is the next magic proton number?\n")
@@ -203,61 +313,89 @@ def build(out_dir: str | Path = "docs") -> Path:
       "mean-field models **Z = 120**, some Skyrme models **Z = 126**. The model is fitted once per "
       "hypothesis and each version is scored on the superheavy data. The global model (before the "
       "data-driven correction) is what controls extrapolation, so that is what gets scored.\n")
-    w("| Hypothesis | Q-alpha rms, Z ≥ 104 (MeV) | mean bias (MeV) | observed decay modes reproduced |")
-    w("|---|---|---|---|")
+    w("| Hypothesis | Q-alpha rms, Z ≥ 104, in sample (MeV) | Forward-test rms (MeV) | "
+      "Forward log-likelihood | Weight | observed decay modes reproduced |")
+    w("|---|---|---|---|---|---|")
+    wts = calculus.hypothesis_weights()
+    fw = {r["hypothesis"]: r for r in validation.mass_model()}
     for r in survey.score_hypotheses():
-        w(f"| {r['hypothesis']} | {r['global_rms_qalpha_SHE_MeV']:.2f} | "
-          f"{r['global_mean_bias_qalpha_SHE_MeV']:+.2f} | {r['decay_modes_correct']} |")
-    w("\nNo hypothesis wins on every test, so all three are carried forward.\n")
+        f = fw[r["hypothesis"]]
+        w(f"| {r['hypothesis']} | {r['global_rms_qalpha_SHE_MeV']:.2f} | {f['rms_MeV']:.2f} | "
+          f"{f['loglik']:.1f} | {wts[r['hypothesis']]:.2f} | {r['decay_modes_correct']} |")
+    best_in = min(survey.score_hypotheses(), key=lambda r: r["global_rms_qalpha_SHE_MeV"])["hypothesis"]
+    best_fw = max(fw.values(), key=lambda r: r["loglik"])["hypothesis"]
+    w(f"\nIn sample, {best_in} fits the superheavy data best. Asked to *predict* heavier nuclei "
+      f"before seeing them, {best_fw} does best"
+      + (" and the ranking reverses: in-sample fit is not evidence about extrapolation." if best_in != best_fw else ".")
+      + " The weights come from the forward log-likelihood, tempered because nested cuts reuse "
+      "nuclei. They are used to average discovery probabilities (section 6); per-hypothesis "
+      "results are always shown as well.\n")
 
     # 3. Island
     w("## 3. The island of stability\n")
     fig_halflife_maps(out / "figures" / "halflife_maps.png")
     w("![half-life maps](figures/halflife_maps.png)\n")
-    w("| Hypothesis | Longest-lived predicted nucleus (Z ≥ 110) | Half-life | Mode |")
-    w("|---|---|---|---|")
+    w("| Hypothesis | Longest-lived predicted nucleus (Z ≥ 110) | Half-life | ±1σ (decades) | Mode |")
+    w("|---|---|---|---|---|")
+    peaks = {}
     for h in nuclear.PROTON_HYPOTHESES:
         peak, _ = survey.island_of_stability(h)
-        w(f"| {h} | {peak['name']} (Z={peak['Z']}, N={peak['N']}) | ~{_fmt_t(peak['log10_T_s'])} | {peak['mode']} |")
+        pr = decay.predict(peak["Z"], peak["N"], h)
+        peaks[h] = (peak, pr.log_t_total_sigma)
+        w(f"| {h} | {peak['name']} (Z={peak['Z']}, N={peak['N']}) | ~{_fmt_t(peak['log10_T_s'])} | "
+          f"{pr.log_t_total_sigma:.1f} | {peak['mode']} |")
     n_known = max(a - z for z, (_, a) in data.KNOWN_ISOTOPES.items() if z >= 110)
-    n_peaks = [survey.island_of_stability(h)[0]["N"] for h in nuclear.PROTON_HYPOTHESES]
+    n_peaks = [p["N"] for p, _ in peaks.values()]
+    z_peaks = [p["Z"] for p, _ in peaks.values()]
     w(f"\nEvery hypothesis puts the longest lifetimes at **N = {min(n_peaks)}–{max(n_peaks)}**, "
       f"{min(n_peaks) - n_known}–{max(n_peaks) - n_known} neutrons beyond the most neutron-rich "
       f"superheavy nucleus made so far (N = {n_known}). Fusion of stable beams with actinide targets "
       "cannot reach that far: the compound nuclei are too neutron-poor. That neutron deficit, not the "
-      "element count, is the real frontier. The island's centre in Z is also uncertain: even with "
-      "the shell placed at 120 or 126, the longest lifetimes stay near Z ≈ 113–115, because "
-      "Coulomb repulsion grows faster than the shell gain.\n")
+      "element count, is the real frontier. Even with the proton shell placed at 120 or 126, the "
+      f"longest lifetimes sit at Z ≈ {min(z_peaks)}–{max(z_peaks)}, because Coulomb repulsion grows "
+      "faster than the shell gain. The *location* (N ≈ 184) is robust across hypotheses. The "
+      "*lifetimes* are not: they carry several decades of uncertainty, set mostly by the fission "
+      "shell-slope prior (section 1).\n")
 
     # 4. Natural occurrence
     w("## 4. Could any of this exist in nature?\n")
-    w("| Environment | Age scale | Half-life needed for 10⁻¹⁵ survival | Longest predicted half-life |")
-    w("|---|---|---|---|")
+    w("| Environment | Age scale | Half-life needed for 10⁻¹⁵ survival | Longest predicted half-life | "
+      "Shortfall (decades) | P(long enough) |")
+    w("|---|---|---|---|---|---|")
     from .confirmation import ENVIRONMENTS
-    best = max(survey.island_of_stability(h)[0]["log10_T_s"] for h in nuclear.PROTON_HYPOTHESES)
+    from .linear import normal_cdf
+    best_h = max(peaks, key=lambda h: peaks[h][0]["log10_T_s"])
+    best, best_sd = peaks[best_h][0]["log10_T_s"], peaks[best_h][1]
+    probs = []
     for name, age, method in ENVIRONMENTS:
-        need = age * math.log10(2) / 15
-        w(f"| {name} | {_fmt_t(math.log10(age))} | ≳ {_fmt_t(math.log10(need))} | {_fmt_t(best)} |")
-    feas = [name.split(" (")[0] for name, age, _ in ENVIRONMENTS
-            if best > math.log10(age * math.log10(2) / 15)]
-    w(f"\nOnly **{', '.join(f.lower() for f in feas) if feas else 'none of these'}** passes on the model's best "
-      "estimate. Primordial survival on Earth or in meteorites would need a half-life about "
-      f"{math.log10(4.567e9 * data.SECONDS_PER_YEAR * math.log10(2) / 15) - best:.0f} decades longer "
-      "than predicted, consistent with past claims of natural superheavy elements failing to hold up. "
-      "Cosmic rays fall short by about "
-      f"{math.log10(15e6 * data.SECONDS_PER_YEAR * math.log10(2) / 15) - best:.0f} decades, which is "
-      "inside the ~2-decade fission uncertainty, so ultra-heavy cosmic-ray searches are a long shot "
-      "rather than hopeless. Kilonova spectra (r-process in neutron-star mergers) are the most "
-      "realistic natural channel, although fission recycling near A ≈ 280–300 limits how far the "
-      "r-process reaches.\n")
+        need = math.log10(age * math.log10(2) / 15)
+        p_ok = normal_cdf((best - need) / best_sd)
+        probs.append((name.split(" (")[0], need - best, p_ok))
+        w(f"| {name} | {_fmt_t(math.log10(age))} | ≳ {_fmt_t(need)} | {_fmt_t(best)} | "
+          f"{max(need - best, 0):.1f} | {p_ok:.2f} |")
+    w(f"\nThe longest-lived candidate is {peaks[best_h][0]['name']} (shell at {best_h}), "
+      f"uncertain by ±{best_sd:.1f} decades. " + " ".join(
+          f"{n}: {'passes on the central estimate' if gap <= 0 else f'falls {gap:.1f} decades short'}"
+          f" (P = {p:.2f})." for n, gap, p in probs)
+      + " Probabilities this far from the calibration data are only as good as the shell prior. "
+      "With honest error bars the model **cannot rule out** long-lived superheavy nuclei on "
+      "theoretical grounds alone: the case against primordial survival is the null result of "
+      "decades of terrestrial and meteoritic searches, not nuclear theory. The island's own "
+      "uncertainty is the largest gap in our knowledge. Kilonova spectra (r-process in "
+      "neutron-star mergers) remain the most direct natural probe, although fission recycling "
+      "near A ≈ 280–300 limits how far the r-process reaches.\n")
 
     # 5. New elements
     w("## 5. Making elements 119–122\n")
     fig_cross_sections(out / "figures" / "cross_sections.png")
     w("![cross sections](figures/cross_sections.png)\n")
-    w("Assumptions: 6 pµA beam, 0.5 mg/cm² target, 50 % separator efficiency, "
+    w("Assumptions: 6 pµA beam, 0.5 mg/cm² target (254Es: 0.001 mg/cm², since only micrograms "
+      "exist), 50 % separator efficiency, "
       f"{survey.SEPARATOR_FLIGHT_TIME_S * 1e6:.0f} µs flight time through the separator. "
       f"Cross sections are uncertain by a factor of ~{10**sig:.1f}.\n")
+    w("Cross sections here are the fit's central values *before* conditioning each reaction on its "
+      "own null search, and beam days are point estimates. Section 6 replaces both with "
+      "probabilities.\n")
     w("| Z | Reaction | Residue | E* (MeV) | σ (fb) | Half-life (1σ decades) | Reach detector | Beam days for 3 chains (90 %) | Chain ends |")
     w("|---|---|---|---|---|---|---|---|---|")
     ranked = survey.rank_new_elements()
@@ -271,17 +409,25 @@ def build(out_dir: str | Path = "docs") -> Path:
       "null result, unrelated to the cross section. Fast digital electronics, which catch decays "
       "within microseconds of implantation, and short separators help here.")
     w("\nCheck against published non-observations:\n")
-    w("| Search | Predicted | Published upper limit | Within 1σ? |")
-    w("|---|---|---|---|")
-    for r in production.validate_against_limits():
+    w("Each search is left out of the fit in turn, and the refitted model is asked how probable "
+      "*zero* events were at that search's exposure (exposure = ln 10 / 90 %-CL limit).\n")
+    w("| Search | Predicted (median) | Published upper limit | P(0 events) | Equivalent tension |")
+    w("|---|---|---|---|---|")
+    lims = production.validate_against_limits()
+    for r in lims:
+        z = _one_sided_sigma(r["p_zero_events"])
         w(f"| {r['reaction']} | {r['predicted_pb'] * 1000:.0f} fb | {r['upper_limit_pb'] * 1000:.0f} fb | "
-          f"{'yes' if r['within_1_sigma'] else '**no** (tension)'} |")
-    w("\nThe 50Ti + 249Bk limit sits about 1.4σ below the prediction. Either the cross section "
-      "falls faster than the fissility trend for Ti-induced reactions, or that search was unlucky. "
-      "This is the most informative constraint on element 119.\n")
+          f"{r['p_zero_events']:.2f} | {f'{z:.1f}σ' if r['p_zero_events'] < 0.5 else 'none'} |")
+    worst = min(lims, key=lambda r: r["p_zero_events"])
+    w(f"\nThe most constraining null result is {worst['reaction']}: a model that has not seen it "
+      f"gives zero events a probability of {worst['p_zero_events']:.2f} "
+      f"({_one_sided_sigma(worst['p_zero_events']):.1f}σ). Either Ti-induced cross sections fall "
+      "faster than the fissility trend or that search was unlucky; the fit and section 6 condition "
+      "on it either way.\n")
+    _section_calculus(w)
 
     # 6. Confirmation
-    w("## 6. How a discovery would be confirmed\n")
+    w("## 7. How a discovery would be confirmed\n")
     plan = confirmation_plan(120, 176)
     w(f"Worked example: **{plan['nucleus']}** from 50Ti + 249Cf (3n), shell at {plan['hypothesis']}.\n")
     w("| Step | Mode | E_alpha (MeV) | Half-life | K-alpha1 (keV) | Known? |")
@@ -314,12 +460,14 @@ def build(out_dir: str | Path = "docs") -> Path:
         q = r["Q_alpha"]
         w(f"| {r['nucleus']} | {q['Z=114']:.2f} | {q['Z=120']:.2f} | {q['Z=126']:.2f} | "
           f"{r['sigma']:.2f} | {r['power']:.1f} |")
-    w("\nIn element-122 chains the three hypotheses differ by about 3 MeV in Q-alpha, roughly 5× "
-      "the model uncertainty, so a single measured chain would pick a winner. Element-120 chains "
-      "separate Z=114 from the other two (about 1 MeV) but barely distinguish 120 from 126.\n")
+    top = disc[0]
+    w(f"\nThe most discriminating reachable nucleus is {top['nucleus']}: the hypotheses differ by "
+      f"{top['spread_MeV']:.1f} MeV in Q-alpha, {top['power']:.1f}× the calibrated model uncertainty. "
+      "With the error bars calibrated by forward tests (they grow with distance from data), one "
+      "measured chain narrows the field but no single chain settles it.\n")
 
     # 7. Limit of the periodic table
-    w("## 7. Where does the periodic table end?\n")
+    w("## 8. Where does the periodic table end?\n")
     zc = atomic.critical_charge()
     reach = []
     for h in nuclear.PROTON_HYPOTHESES:
@@ -347,12 +495,16 @@ def build(out_dir: str | Path = "docs") -> Path:
         w(f"| {z} | {e['symbol']} | … {tail} | {rp.get('config', '')} | {rp.get('note', '')} |")
     w("")
 
-    w("## 8. Limitations\n")
+    w("## 9. Limitations\n")
     w("* The mass model is spherical Myers–Swiatecki shell structure plus a deformation term. It "
       "does not resolve the deformed sub-shells at N = 152/162, which the Gaussian-process "
       "correction absorbs only near data.")
-    w("* Fission half-lives are uncertain by about 2 decades even where calibrated. Weak-decay "
-      "(EC/β) half-lives are order-of-magnitude estimates.")
+    w("* Fission half-lives are uncertain by about 2.5 decades even where calibrated (leave-one-out), "
+      "and by far more on the island, where the shell slope rests on an explicit prior that the data "
+      "cannot test. Weak-decay (EC/β) half-lives are order-of-magnitude estimates.")
+    w("* The discovery calculus neglects correlations between the residue's half-life and the "
+      "anchoring probability (both depend on the same Q-alpha), and picks one evaporation channel "
+      "per reaction.")
     w("* Cross sections use one-parameter fissility systematics. Real reaction dynamics "
       "(quasi-fission, deformation of the target, beam energy choice) can shift them by "
       "factors of several.")

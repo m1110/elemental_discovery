@@ -15,6 +15,10 @@ down the shell structure in the superheavy region, where it matters most).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+import hashlib
+import json
+import os
 
 import numpy as np
 
@@ -130,6 +134,15 @@ class MassModel:
     rms_binding: float = float("nan")
     rms_qalpha: float = float("nan")
     _gp: "ResidualGP" = field(default=None, repr=False)
+    binding_data: list = field(default=None, repr=False)
+    alpha_data: list = field(default=None, repr=False)
+    # Growth of the Q-alpha error with distance from measured nuclei (MeV per
+    # unit distance in the Z-N plane), calibrated by forward tests; None = off.
+    extrap_k: float | None = None
+
+    def __post_init__(self):
+        self.binding_data = list(data.BINDING_ENERGIES if self.binding_data is None else self.binding_data)
+        self.alpha_data = list(data.ALPHA_DECAYS if self.alpha_data is None else self.alpha_data)
 
     @property
     def proton_magic(self) -> tuple[int, ...]:
@@ -143,12 +156,12 @@ class MassModel:
             return shell_and_deformation(z, n, pm, c_shell, kappa)[0]
 
         rows, targets, weights = [], [], []
-        for z, a, b in data.BINDING_ENERGIES:
+        for z, a, b in self.binding_data:
             n = a - z
             rows.append(basis(z, n))
             targets.append(b + esh(z, n))
             weights.append(1 / sigma_b)
-        for z, a, q, _ in data.ALPHA_DECAYS:
+        for z, a, q, _ in self.alpha_data:
             n = a - z
             rows.append(basis(z - 2, n - 2) - basis(z, n))
             targets.append(q - data.B_HE4 + esh(z - 2, n - 2) - esh(z, n))
@@ -173,8 +186,8 @@ class MassModel:
         self._gp = None
         self.c_shell, self.kappa = float(self.c_shell), float(self.kappa)
 
-        rb = [self.binding(z, a - z) - b for z, a, b in data.BINDING_ENERGIES]
-        rq = [self.q_alpha_global(z, a - z) - q for z, a, q, _ in data.ALPHA_DECAYS]
+        rb = [self.binding(z, a - z) - b for z, a, b in self.binding_data]
+        rq = [self.q_alpha_global(z, a - z) - q for z, a, q, _ in self.alpha_data]
         self.rms_binding = float(np.sqrt(np.mean(np.square(rb))))
         self.rms_qalpha = float(np.sqrt(np.mean(np.square(rq))))
         return self
@@ -214,13 +227,29 @@ class MassModel:
     def q_alpha_with_uncertainty(self, z: int, n: int) -> tuple[float, float]:
         """(Q-alpha, 1-sigma) in MeV.  Near measured nuclei the GP correction
         pulls the prediction onto the data and the error is small; far away it
-        relaxes to the global model and the error grows to the model's
-        intrinsic scatter."""
+        relaxes to the global model.
+
+        A stationary GP's error saturates at its amplitude however far one
+        extrapolates, while the global model's bias keeps growing.  Forward
+        tests (fit Z < cut, predict Z >= cut) show the saturated GP error is
+        2.5-3.5x too small.  So a distance term is added in quadrature,
+            sd^2 = sd_GP^2 + (k d)^2,
+        with d the distance in the (Z, N) plane to the nearest measured alpha
+        emitter and k calibrated by maximum likelihood on the forward tests."""
         self._require_fit()
         if self._gp is None:
             self._gp = ResidualGP.train(self)
         corr, sig = self._gp.predict(z, n)
+        k = self.extrap_k
+        if k is None and self.alpha_data == list(data.ALPHA_DECAYS):
+            k = extrapolation_rate(self.hypothesis)
+        if k:
+            sig = float(np.hypot(sig, k * self.distance_to_data(z, n)))
         return self.q_alpha_global(z, n) + corr, sig
+
+    def distance_to_data(self, z: int, n: int) -> float:
+        x = np.array([[zz, aa - zz] for zz, aa, *_ in self.alpha_data], float)
+        return float(np.min(np.hypot(x[:, 0] - z, x[:, 1] - n)))
 
     def s_n(self, z: int, n: int) -> float:
         """One-neutron separation energy."""
@@ -296,9 +325,9 @@ class ResidualGP:
 
     @classmethod
     def train(cls, model: "MassModel", noise: float = 0.08) -> "ResidualGP":
-        x = np.array([[z, a - z] for z, a, _, _ in data.ALPHA_DECAYS], float)
+        x = np.array([[z, a - z] for z, a, _, _ in model.alpha_data], float)
         r = np.array(
-            [q - model.q_alpha_global(z, a - z) for z, a, q, _ in data.ALPHA_DECAYS]
+            [q - model.q_alpha_global(z, a - z) for z, a, q, _ in model.alpha_data]
         )
         best = max(
             (
@@ -323,6 +352,69 @@ class ResidualGP:
 
 
 _CACHE: dict[str, MassModel] = {}
+
+FORWARD_CUTS = (104, 108, 110, 112, 114, 116)
+_CACHE_DIR = Path(os.environ.get("ELEMENTAL_CACHE", Path.home() / ".cache" / "elemental_discovery"))
+
+
+def forward_qalpha_errors(hypothesis: str, cuts=FORWARD_CUTS) -> list[tuple[float, float, float]]:
+    """For each cut: refit on alpha emitters with Z < cut, predict those with
+    Z >= cut.  Returns (distance to data, error, GP sd) for every prediction."""
+    out = []
+    for cut in cuts:
+        train = [r for r in data.ALPHA_DECAYS if r[0] < cut]
+        m = MassModel(hypothesis, alpha_data=train, extrap_k=0.0).fit()
+        for z, a, q, _ in data.ALPHA_DECAYS:
+            if z >= cut:
+                qp, sd = m.q_alpha_with_uncertainty(z, a - z)
+                out.append((m.distance_to_data(z, a - z), qp - q, sd))
+    return out
+
+
+def _calibrate(rows) -> dict:
+    d, e, s = map(np.array, zip(*rows))
+    ks = np.linspace(0.0, 0.5, 501)
+    v = s[None, :] ** 2 + (ks[:, None] * d[None, :]) ** 2
+    ll = -0.5 * (e[None, :] ** 2 / v + np.log(2 * np.pi * v)).sum(1)
+    i = int(np.argmax(ll))
+    k = float(ks[i])
+    return {"k": k, "loglik": float(ll[i]), "n": int(len(e)),
+            "rms_MeV": float(np.sqrt(np.mean(e**2))), "bias_MeV": float(np.mean(e)),
+            "z_rms_gp_only": float(np.sqrt(np.mean((e / s) ** 2))),
+            "z_rms_calibrated": float(np.sqrt(np.mean(e**2 / (s**2 + (k * d) ** 2))))}
+
+
+def forward_calibration(hypothesis: str) -> dict:
+    """Forward-test calibration of the Q-alpha error, cached on disk (it needs
+    ~6 refits of the mass model).  k is the ML growth rate of the error (MeV
+    per unit distance in the Z-N plane); loglik is the predictive
+    log-likelihood of the forward tests -- how well this hypothesis *predicted*
+    heavier nuclei before seeing them."""
+    key = hashlib.sha1(json.dumps([hypothesis, data.ALPHA_DECAYS, data.BINDING_ENERGIES,
+                                   FORWARD_CUTS, PROTON_HYPOTHESES[hypothesis], 2]).encode()).hexdigest()
+    if key in _RATE_CACHE:
+        return _RATE_CACHE[key]
+    f = _CACHE_DIR / "qalpha_extrapolation.json"
+    try:
+        cached = json.loads(f.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if not isinstance(cached.get(key), dict):
+        cached[key] = _calibrate(forward_qalpha_errors(hypothesis))
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(cached))
+        except OSError:
+            pass
+    _RATE_CACHE[key] = cached[key]
+    return cached[key]
+
+
+def extrapolation_rate(hypothesis: str) -> float:
+    return forward_calibration(hypothesis)["k"]
+
+
+_RATE_CACHE: dict[str, dict] = {}
 
 
 def get_model(hypothesis: str = "Z=114") -> MassModel:
