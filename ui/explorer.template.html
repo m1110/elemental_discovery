@@ -1,0 +1,607 @@
+<title>Superheavy Element Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a lab console. The chart of nuclides leads, with a reading panel beside it;
+   the discovery planner and the model checks follow as full-width bands. */
+:root {
+  --paper: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #131820;
+  --ink-2: #4d5665;
+  --ink-3: #7a8494;
+  --rule: #dce1e8;
+  --accent: #2c56c9;
+  --accent-soft: #e4ebfb;
+  /* Karlsruhe chart-of-nuclides convention */
+  --m-alpha: #f1c232;
+  --m-sf: #3fa35b;
+  --m-ec: #e0607a;
+  --m-beta: #3d86d6;
+  --known: #131820;
+  --good: #23824a;
+  --warn: #b7791f;
+  --bad: #c2384b;
+  --h114: #2c56c9;
+  --h120: #d4692b;
+  --h126: #1f9a72;
+  --avg: #131820;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Verdana", "Segoe UI", system-ui, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --s-xs: 0.8125rem; --s-sm: 0.9rem; --s-md: 1rem; --s-lg: 1.25rem; --s-xl: 1.75rem; --s-2xl: clamp(2rem, 4.5vw, 3rem);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1117; --surface: #161b23; --ink: #e9edf3; --ink-2: #a6afbd; --ink-3: #7e8899;
+    --rule: #2a313d; --accent: #86a4ff; --accent-soft: #1f2a45;
+    --m-alpha: #e8bb2e; --m-sf: #46b366; --m-ec: #ec7088; --m-beta: #5a9de6; --known: #f3f5f8;
+    --good: #4cc27c; --warn: #e0a440; --bad: #f0697c;
+    --h114: #86a4ff; --h120: #f39257; --h126: #43c99b; --avg: #e9edf3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1117; --surface: #161b23; --ink: #e9edf3; --ink-2: #a6afbd; --ink-3: #7e8899;
+  --rule: #2a313d; --accent: #86a4ff; --accent-soft: #1f2a45;
+  --m-alpha: #e8bb2e; --m-sf: #46b366; --m-ec: #ec7088; --m-beta: #5a9de6; --known: #f3f5f8;
+  --good: #4cc27c; --warn: #e0a440; --bad: #f0697c;
+  --h114: #86a4ff; --h120: #f39257; --h126: #43c99b; --avg: #e9edf3;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: var(--s-md);
+  line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: var(--s-2xl); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: var(--s-xl); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: var(--s-lg); font-weight: 500; }
+p { margin: 0; max-width: 68ch; }
+.muted { color: var(--ink-2); }
+.eyebrow { font-family: var(--f-data); font-size: var(--s-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* header */
+header.top { padding-block: 32px 20px; display: grid; gap: 16px; }
+.top-row { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: end; justify-content: space-between; }
+.lede { font-size: 1.075rem; color: var(--ink-2); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact { font-family: var(--f-data); font-size: var(--s-xs); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 12px; color: var(--ink-2); }
+.fact b { color: var(--ink); font-weight: 500; }
+
+/* hypothesis switch */
+.hyp { display: grid; gap: 8px; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 4px; gap: 4px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 8px 14px; border-radius: 9px; cursor: pointer; display: grid; gap: 0; text-align: left; min-width: 0; }
+.seg button .k { font-weight: 700; }
+.seg button .v { font-family: var(--f-data); font-size: var(--s-xs); color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--paper); }
+
+section.band { padding-block: 28px; border-top: 1px solid var(--rule); display: grid; gap: 20px; }
+.band-head { display: grid; gap: 6px; }
+
+/* chart of nuclides */
+.chart-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 980px) { .chart-layout { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
+.chart-card { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.chart-tools { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+.seg.small button { padding: 6px 12px; font-size: var(--s-sm); }
+#elemSeg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#elemSeg button { text-align: center; padding: 6px 4px; }
+.find { display: flex; gap: 8px; align-items: center; }
+.find input { width: 11rem; padding: 7px 10px; border: 1px solid var(--rule); background: var(--paper); border-radius: 8px; }
+.find .err { font-size: var(--s-xs); color: var(--bad); }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#chart { display: block; width: 100%; min-width: 660px; height: auto; }
+#chart .cell { cursor: pointer; }
+#chart text { fill: var(--ink-2); font-family: var(--f-data); font-size: 11px; }
+#chart .axis-title { fill: var(--ink); font-size: 12px; font-family: var(--f-body); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: var(--s-sm); color: var(--ink-2); align-items: center; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+.sw.known { background: transparent; box-shadow: inset 0 0 0 2px var(--known); }
+.ramp { display: inline-flex; align-items: center; gap: 8px; }
+.ramp .bar { width: 160px; height: 12px; border-radius: 3px; }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--paper); padding: 6px 10px; border-radius: 6px; font-size: var(--s-xs); font-family: var(--f-data); white-space: nowrap; }
+
+.reading { padding: 18px; display: grid; gap: 14px; }
+.nuc-name { font-family: var(--f-display); font-weight: 700; font-size: 2.6rem; line-height: 1; letter-spacing: -0.02em; }
+.nuc-name sup { font-size: 0.45em; vertical-align: 1.05em; margin-right: 1px; font-weight: 500; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: var(--s-xs); font-weight: 700; border: 1px solid var(--rule); background: var(--paper); }
+.chip.ok { color: var(--good); }
+.chip.new { color: var(--accent); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: var(--s-sm); }
+.kv dt { color: var(--ink-2); }
+.kv dd { margin: 0; text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.branch-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--rule); }
+.chain { display: grid; gap: 6px; }
+.chain ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--f-data); font-size: var(--s-xs); }
+.chain li { padding: 3px 8px; border-radius: 6px; border: 1px solid var(--rule); }
+.chain li.k { border-color: var(--known); font-weight: 500; }
+.chain .arr { border: 0; padding: 0; color: var(--ink-3); }
+.note { font-size: var(--s-xs); color: var(--ink-2); }
+
+/* planner */
+.planner { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .planner { grid-template-columns: minmax(0, 1fr); } }
+.controls { padding: 18px; display: grid; gap: 18px; }
+.ctl { display: grid; gap: 6px; }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; font-size: var(--s-sm); font-weight: 700; }
+.ctl label .num { font-weight: 500; color: var(--accent); }
+.ctl input[type=range] { width: 100%; accent-color: var(--accent); }
+.ctl .hint { font-size: var(--s-xs); color: var(--ink-2); }
+.rx-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.rx { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; text-align: left; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--rule); background: var(--surface); cursor: pointer; }
+.rx:hover { border-color: var(--ink-3); }
+.rx[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
+.rx .lab { font-weight: 700; }
+.rx .sub { font-size: var(--s-xs); color: var(--ink-2); grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.rx .p { font-family: var(--f-data); font-size: var(--s-lg); font-weight: 500; }
+.tag { font-size: 0.75rem; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.tag.warn { color: var(--warn); }
+.tag.bad { color: var(--bad); }
+.result { padding: 18px; display: grid; gap: 18px; min-width: 0; }
+.result-head { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: end; justify-content: space-between; }
+.big { font-family: var(--f-display); font-size: clamp(2.6rem, 6vw, 3.6rem); font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.hbars { display: grid; gap: 8px; }
+.hbar { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) 3.4rem; gap: 10px; align-items: center; font-size: var(--s-sm); }
+.hbar .track { height: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.hbar .fill { height: 100%; border-radius: 6px; }
+.hbar .w { font-family: var(--f-data); font-size: var(--s-xs); color: var(--ink-2); }
+.result-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 720px) { .result-grid { grid-template-columns: minmax(0, 1fr); } }
+#curve { width: 100%; height: auto; display: block; }
+#curve text { fill: var(--ink-2); font-family: var(--f-data); font-size: 11px; }
+.why { display: grid; gap: 10px; font-size: var(--s-sm); }
+.why table { width: 100%; border-collapse: collapse; font-size: var(--s-xs); }
+.why th, .why td { padding: 6px 4px; border-bottom: 1px solid var(--rule); text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; font-weight: 400; }
+.why th:first-child, .why td:first-child { text-align: left; font-family: var(--f-body); }
+.why thead th { color: var(--ink-2); }
+
+/* checks */
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 820px) { .checks { grid-template-columns: minmax(0, 1fr); } }
+.check { padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.check svg { width: 100%; height: auto; display: block; }
+.check svg text { fill: var(--ink-2); font-family: var(--f-data); font-size: 11px; }
+.check .take { font-size: var(--s-sm); }
+footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: grid; gap: 8px; font-size: var(--s-sm); color: var(--ink-2); }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.25s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Beyond oganesson · Z = 119 and up</div>
+    <div class="top-row">
+      <div style="display:grid; gap:10px; min-width:0">
+        <h1>Superheavy Element Explorer</h1>
+        <p class="lede">Predicted half-lives and decay chains for nuclei no one has made yet, and the odds that a real experiment would discover the next element. Every prediction carries an error bar checked against nuclei the model had not seen.</p>
+      </div>
+      <div class="hyp">
+        <div class="eyebrow">Next magic proton number</div>
+        <div class="seg" id="hypSeg" role="group" aria-label="Proton shell hypothesis"></div>
+      </div>
+    </div>
+    <div class="facts" id="facts"></div>
+  </header>
+
+  <section class="band" aria-labelledby="h-chart">
+    <div class="band-head">
+      <h2 id="h-chart">Chart of nuclides, Z 100–130</h2>
+      <p class="muted">Protons up, neutrons across. Outlined cells are nuclides that have been made and measured; everything else is a prediction. Hover for a quick reading, click for the full one.</p>
+    </div>
+    <div class="chart-layout">
+      <div class="panel chart-card">
+        <div class="chart-tools">
+          <div class="seg small" id="viewSeg" role="group" aria-label="Colour cells by">
+            <button type="button" data-view="mode" aria-pressed="true">Decay mode</button>
+            <button type="button" data-view="t" aria-pressed="false">Half-life</button>
+            <button type="button" data-view="sd" aria-pressed="false">Uncertainty</button>
+          </div>
+          <form class="find" id="findForm" autocomplete="off">
+            <label for="findInput" class="eyebrow">Find</label>
+            <input id="findInput" placeholder="296Ubn or 120,296" aria-describedby="findErr">
+            <span class="err" id="findErr" role="status"></span>
+          </form>
+        </div>
+        <div class="scroll-x"><svg id="chart" role="img" aria-label="Chart of nuclides with predicted half-lives"></svg></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <aside class="panel reading" id="reading" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="h-plan">
+    <div class="band-head">
+      <h2 id="h-plan">Discovery planner</h2>
+      <p class="muted">The chance that one campaign records enough decay chains, each traced back to a known nucleus, to claim a new element. It accounts for an uncertain cross section, atoms that decay in flight, and chains that fission before they reach known territory.</p>
+    </div>
+    <div class="planner">
+      <div class="panel controls">
+        <div class="ctl">
+          <div class="eyebrow">Element</div>
+          <div class="seg small" id="elemSeg" role="group" aria-label="Element to make"></div>
+        </div>
+        <div class="ctl"><label for="cDays">Campaign length <span class="num" id="vDays"></span></label>
+          <input type="range" id="cDays" min="30" max="1000" step="10" value="300"></div>
+        <div class="ctl"><label for="cBeam">Beam intensity <span class="num" id="vBeam"></span></label>
+          <input type="range" id="cBeam" min="0.5" max="10" step="0.5" value="6">
+          <span class="hint">Particle microamperes on target. 6 pµA is an optimistic modern figure.</span></div>
+        <div class="ctl"><label for="cChains">Chains needed <span class="num" id="vChains"></span></label>
+          <input type="range" id="cChains" min="1" max="6" step="1" value="3"></div>
+        <div class="ctl"><label for="cEff">Separator efficiency <span class="num" id="vEff"></span></label>
+          <input type="range" id="cEff" min="10" max="80" step="5" value="50"></div>
+        <div class="ctl"><label for="cFlight">Flight time to detector <span class="num" id="vFlight"></span></label>
+          <input type="range" id="cFlight" min="0.2" max="5" step="0.1" value="1">
+          <span class="hint">Atoms that decay before arriving are lost.</span></div>
+      </div>
+      <div style="display:grid;gap:16px;min-width:0">
+        <div class="ctl"><div class="eyebrow">Reaction · probability for this campaign</div>
+          <div class="rx-list" id="rxList"></div></div>
+        <div class="panel result" id="result"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="h-checks">
+    <div class="band-head">
+      <h2 id="h-checks">How much to trust it</h2>
+      <p class="muted">Each law was fitted on lighter nuclei and asked to predict heavier ones it had not seen, the way the elements were actually discovered.</p>
+    </div>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <footer>
+    <div id="cite"></div>
+    <div>Cross sections and their null searches are hand-compiled from the discovery papers. Predictions come from a transparent macroscopic–microscopic model and are no substitute for microscopic calculations. Generated by <span class="num">tools/build_ui.py</span> in the elemental_discovery repository.</div>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>const D=/*__DATA__*/null;</script>
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const NS = "http://www.w3.org/2000/svg";
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const HC = { "Z=114": "--h114", "Z=120": "--h120", "Z=126": "--h126" };
+  const MODE_NAME = { a: "alpha", f: "fission", e: "EC / β⁺", b: "β⁻" };
+  const MODE_VAR = { a: "--m-alpha", f: "--m-sf", e: "--m-ec", b: "--m-beta" };
+  const NB_MODE = { A: "a", SF: "f", "B+": "e", EC: "e", "e+": "e", "B-": "b" };
+  const SHELL = { "Z=114": 114, "Z=120": 120, "Z=126": 126 };
+  const RAMP = ["#fdf2d2", "#f6c46a", "#e5813d", "#c14b3f", "#842a54", "#3f1f5c"];
+
+  const state = { hyp: "Z=114", view: "mode", sel: [120, 176], elem: 120, rx: null,
+                  days: 300, beam: 6, chains: 3, eff: 50, flight: 1 };
+  try { const s = JSON.parse(localStorage.getItem("sxe") || "{}"); if (s.hyp && D.hyps.includes(s.hyp)) state.hyp = s.hyp; if (s.view) state.view = s.view; } catch (e) {}
+  const save = () => { try { localStorage.setItem("sxe", JSON.stringify({ hyp: state.hyp, view: state.view })); } catch (e) {} };
+
+  // ---------- formatting ----------
+  const sym = (z) => D.symbols[z] || "?";
+  function fmtT(lt) {
+    if (lt === null || !isFinite(lt)) return "—";
+    const t = Math.pow(10, lt);
+    const U = [["Gyr", 3.156e16], ["Myr", 3.156e13], ["kyr", 3.156e10], ["yr", 3.156e7], ["d", 86400], ["h", 3600], ["min", 60], ["s", 1], ["ms", 1e-3], ["µs", 1e-6], ["ns", 1e-9], ["ps", 1e-12]];
+    for (const [u, s] of U) if (t >= s) { const v = t / s; return (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + " " + u; }
+    return t.toExponential(1) + " s";
+  }
+  const pct = (p) => p >= 0.995 ? ">99%" : p < 0.005 ? (p > 0 ? "<1%" : "0%") : Math.round(p * 100) + "%";
+  const nucHTML = (z, n) => `<sup>${z + n}</sup>${sym(z)}`;
+  const nucText = (z, n) => `${z + n}${sym(z)}`;
+
+  // ---------- header ----------
+  const V = D.validation;
+  $("#facts").innerHTML = [
+    [V.counts.alpha, "alpha emitters"], [V.counts.sf, "fission half-lives"], [V.counts.known, "known nuclides, Z ≥ 100"],
+  ].map(([n, l]) => `<span class="fact"><b>${n}</b> ${l} · NUBASE2020</span>`).join("");
+  $("#cite").textContent = "Nuclear data: " + D.citation + ".";
+
+  function renderHyp() {
+    $("#hypSeg").innerHTML = D.hyps.map(h => `<button type="button" data-h="${h}" aria-pressed="${h === state.hyp}">
+      <span class="k">${h}</span><span class="v">weight ${(D.weights[h] * 100).toFixed(D.weights[h] < 0.01 ? 1 : 0)}%</span></button>`).join("");
+  }
+  $("#hypSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; state.hyp = b.dataset.h; save(); renderAll(); });
+
+  // ---------- chart ----------
+  const CELL = 13, PADL = 64, PADB = 40, PADT = 14, PADR = 10;
+  const [Z0, Z1] = D.Z, [N0, N1] = D.N;
+  const W = PADL + (N1 - N0 + 1) * CELL + PADR, H = PADT + (Z1 - Z0 + 1) * CELL + PADB;
+  const cx = (n) => PADL + (n - N0) * CELL, cy = (z) => PADT + (Z1 - z) * CELL;
+  function rampColor(x) { // x in [0,1]
+    x = Math.max(0, Math.min(1, x)); const p = x * (RAMP.length - 1), i = Math.min(Math.floor(p), RAMP.length - 2), f = p - i;
+    const a = RAMP[i], b = RAMP[i + 1], h = (s, k) => parseInt(s.slice(1 + 2 * k, 3 + 2 * k), 16);
+    return "rgb(" + [0, 1, 2].map(k => Math.round(h(a, k) + (h(b, k) - h(a, k)) * f)).join(",") + ")";
+  }
+  const T_LO = -9, T_HI = 12; // ns .. ~30 kyr
+  function cellFill(c, meas) {
+    if (state.view === "mode") {
+      let m = c ? c[2] : null;
+      if (meas && meas[1]) { let best = 0; for (const k in meas[1]) if (NB_MODE[k] && meas[1][k] > best) { best = meas[1][k]; m = NB_MODE[k]; } }
+      return css(MODE_VAR[m] || "--rule");
+    }
+    if (state.view === "t") { const lt = meas ? meas[0] : c && c[0]; return lt === null ? css("--rule") : rampColor((lt - T_LO) / (T_HI - T_LO)); }
+    if (!c) return css("--rule");
+    return rampColor(Math.min(c[1] / 6, 1));
+  }
+  function renderChart() {
+    const svg = $("#chart"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = "";
+    const g = document.createElementNS(NS, "g"); svg.appendChild(g);
+    const grid = D.grid[state.hyp];
+    const add = (tag, attrs, parent = g) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); parent.appendChild(el); return el; };
+    // axes labels
+    for (let z = Z0; z <= Z1; z++) if (z % 2 === 0) add("text", { x: PADL - 6, y: cy(z) + CELL - 3, "text-anchor": "end" }).textContent = `${z} ${sym(z)}`;
+    for (let n = N0; n <= N1; n++) if (n % 10 === 0) add("text", { x: cx(n) + CELL / 2, y: H - PADB + 16, "text-anchor": "middle" }).textContent = n;
+    add("text", { x: PADL + (N1 - N0 + 1) * CELL / 2, y: H - 6, "text-anchor": "middle", class: "axis-title" }).textContent = "Neutron number N →";
+    // cells
+    const keys = new Set([...Object.keys(grid), ...Object.keys(D.measured)]);
+    const known = [];
+    for (const key of keys) {
+      const [z, n] = key.split(",").map(Number); if (z < Z0 || z > Z1 || n < N0 || n > N1) continue;
+      const c = grid[key], meas = D.measured[key];
+      const r = add("rect", { x: cx(n) + 0.5, y: cy(z) + 0.5, width: CELL - 1, height: CELL - 1, rx: 2, fill: cellFill(c, meas), class: "cell", "data-k": key });
+      if (meas) known.push([z, n]);
+    }
+    for (const [z, n] of known) add("rect", { x: cx(n) + 1.25, y: cy(z) + 1.25, width: CELL - 2.5, height: CELL - 2.5, rx: 2, fill: "none", stroke: css("--known"), "stroke-width": 1.5, "pointer-events": "none" });
+    // magic lines
+    const line = (x1, y1, x2, y2, lab, lx, ly, anchor) => {
+      add("line", { x1, y1, x2, y2, stroke: css("--ink"), "stroke-width": 1.2, "stroke-dasharray": "4 3", "pointer-events": "none", opacity: 0.75 });
+      add("text", { x: lx, y: ly, "text-anchor": anchor || "start", style: `fill:${css("--ink")};font-weight:500` }).textContent = lab;
+    };
+    line(cx(184), PADT, cx(184), H - PADB, "N = 184", cx(184) + 4, PADT + 10);
+    const zs = SHELL[state.hyp];
+    line(PADL, cy(zs), W - PADR, cy(zs), `Z = ${zs} (assumed shell)`, W - PADR - 4, cy(zs) - 4, "end");
+    // selection
+    const [sz, sn] = state.sel;
+    add("rect", { x: cx(sn) - 1, y: cy(sz) - 1, width: CELL + 2, height: CELL + 2, rx: 3, fill: "none", stroke: css("--accent"), "stroke-width": 2.5, "pointer-events": "none" });
+    renderLegend();
+  }
+  function renderLegend() {
+    const L = $("#legend");
+    const k = `<span><span class="sw known"></span>made and measured</span>`;
+    if (state.view === "mode") L.innerHTML = ["a", "f", "e", "b"].map(m => `<span><span class="sw" style="background:var(${MODE_VAR[m]})"></span>${MODE_NAME[m]}</span>`).join("") + k;
+    else {
+      const stops = RAMP.map((c, i) => `${c} ${i / (RAMP.length - 1) * 100}%`).join(",");
+      const [a, b] = state.view === "t" ? ["1 ns", "30 kyr"] : ["±0", "±6 decades"];
+      L.innerHTML = `<span class="ramp">${a}<span class="bar" style="background:linear-gradient(90deg,${stops})"></span>${b}</span>` + k
+        + (state.view === "sd" ? `<span>Measured nuclides show their predicted uncertainty.</span>` : "");
+    }
+  }
+  const tip = $("#tip");
+  $("#chart").addEventListener("mousemove", (e) => {
+    const k = e.target.dataset && e.target.dataset.k; if (!k) { tip.hidden = true; return; }
+    const [z, n] = k.split(",").map(Number), c = D.grid[state.hyp][k], m = D.measured[k];
+    tip.textContent = `${nucText(z, n)}  ·  ` + (m ? `measured ${fmtT(m[0])}` : c ? `predicted ${fmtT(c[0])} (±${c[1].toFixed(1)} dec), ${MODE_NAME[c[2]]}` : "");
+    tip.hidden = false;
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x + "px"; tip.style.top = (e.clientY + 16) + "px";
+  });
+  $("#chart").addEventListener("mouseleave", () => tip.hidden = true);
+  $("#chart").addEventListener("click", (e) => { const k = e.target.dataset && e.target.dataset.k; if (!k) return; state.sel = k.split(",").map(Number); renderChart(); renderReading(); });
+  $("#viewSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; state.view = b.dataset.view; save(); syncView(); renderChart(); });
+  function syncView() { for (const b of $("#viewSeg").children) b.setAttribute("aria-pressed", b.dataset.view === state.view); }
+  $("#findForm").addEventListener("submit", (e) => {
+    e.preventDefault(); const s = $("#findInput").value.trim(); let z, a;
+    let m = s.match(/^(\d{1,3})\s*[, ]\s*(\d{3})$/);
+    if (m) { z = +m[1]; a = +m[2]; }
+    else if ((m = s.match(/^(\d{3})\s*([A-Za-z]{1,3})$/))) { a = +m[1]; const t = m[2].toLowerCase(); for (const k in D.symbols) if (D.symbols[k].toLowerCase() === t) z = +k; }
+    const key = `${z},${a - z}`;
+    if (!z || !(D.grid[state.hyp][key] || D.measured[key])) { $("#findErr").textContent = "Not on this chart. Try Z,A such as 120,296."; return; }
+    $("#findErr").textContent = ""; state.sel = [z, a - z]; renderChart(); renderReading();
+  });
+
+  // ---------- reading panel ----------
+  function alphaChain(z, n) {
+    const grid = D.grid[state.hyp]; const path = []; let p = 1;
+    for (let i = 0; i < 8; i++) {
+      const key = `${z},${n}`;
+      if (i > 0 && D.measured[key]) { path.push({ z, n, known: true }); return { path, p }; }
+      const c = grid[key]; if (!c) { path.push({ z, n, off: true }); return { path, p: 0 }; }
+      path.push({ z, n, pa: c[5] }); p *= c[5]; z -= 2; n -= 2;
+      if (z < 100) return { path, p: 0 };
+    }
+    return { path, p: 0 };
+  }
+  function renderReading() {
+    const [z, n] = state.sel, key = `${z},${n}`, c = D.grid[state.hyp][key], m = D.measured[key];
+    let h = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:start">
+      <div><div class="eyebrow">Z = ${z} · N = ${n}</div><div class="nuc-name">${nucHTML(z, n)}</div></div>
+      ${m ? `<span class="chip ok">Measured${m[3] ? " · " + m[3] : ""}</span>` : `<span class="chip new">Not yet made</span>`}</div>`;
+    if (m) {
+      const br = Object.entries(m[1]).map(([k, v]) => `${k === "A" ? "α" : k} ${v}%`).join(", ");
+      h += `<dl class="kv"><dt>Measured half-life</dt><dd>${fmtT(m[0])}</dd>
+        ${br ? `<dt>Measured branches</dt><dd>${br}</dd>` : ""}
+        ${m[2] !== null ? `<dt>Q-alpha (NUBASE2020)</dt><dd>${m[2].toFixed(2)} MeV</dd>` : ""}</dl>`;
+    }
+    if (c) {
+      const lo = c[0] - c[1], hi = c[0] + c[1];
+      const segs = Object.entries(c[6]).map(([k, v]) => `<span title="${MODE_NAME[k]} ${pct(v)}" style="width:${v * 100}%;background:var(${MODE_VAR[k]})"></span>`).join("");
+      h += `<div style="display:grid;gap:8px"><div class="eyebrow">Model prediction · shell at ${state.hyp}</div>
+        <dl class="kv"><dt>Half-life</dt><dd>${fmtT(c[0])}</dd>
+        <dt>1σ range</dt><dd>${fmtT(lo)} – ${fmtT(hi)}</dd>
+        <dt>Decays mainly by</dt><dd>${MODE_NAME[c[2]]}</dd>
+        <dt>Q-alpha</dt><dd>${c[3] !== null ? c[3].toFixed(2) + " ± " + c[4].toFixed(2) + " MeV" : "—"}</dd>
+        <dt>Alpha energy seen</dt><dd>${c[3] !== null ? (c[3] * (z + n - 4) / (z + n)).toFixed(2) + " MeV" : "—"}</dd>
+        <dt>K-alpha1 X-ray</dt><dd>${D.kalpha[z] ? D.kalpha[z].toFixed(1) + " keV" : "—"}</dd></dl>
+        <div class="branch-bar" aria-label="Predicted branching">${segs}</div></div>`;
+      if (!m) {
+        const ch = alphaChain(z, n);
+        const items = ch.path.map((s, i) => `${i ? '<li class="arr" aria-hidden="true">→</li>' : ""}<li class="${s.known ? "k" : ""}">${nucText(s.z, s.n)}${s.known ? " ✓" : ""}</li>`).join("");
+        const end = ch.path[ch.path.length - 1];
+        h += `<div class="chain"><div class="eyebrow">Alpha chain to known nuclei</div><ol>${items}</ol>
+          <p class="note">${end && end.known
+            ? `Probability every new link alpha-decays rather than fissions: <b class="num">${pct(ch.p)}</b>. Under the discovery criteria the chain must reach a known nucleus like this.`
+            : `This chain does not reach a measured nucleus within the chart, so a discovery here would need another way to prove Z, such as X-ray identification.`}</p></div>`;
+      }
+      h += `<p class="note">Uncertainties are 1σ. Half-life errors are in decades, and they widen with distance from measured nuclei.</p>`;
+    } else if (!m) h += `<p class="muted">No prediction for this cell.</p>`;
+    $("#reading").innerHTML = h;
+  }
+
+  // ---------- discovery calculus ----------
+  const GX = D.gh.x, GW = D.gh.w;
+  function pAtLeast(k, mu) { let term = Math.exp(-mu), cdf = 0; for (let i = 0; i < k; i++) { cdf += term; term *= mu / (i + 1); } return Math.min(Math.max(1 - cdf, 0), 1); }
+  function model(rx, h) {
+    const H = rx.hyp[h], tf = state.flight * 1e-6;
+    const surv = GX.map(x => Math.exp(-Math.LN2 * tf / Math.pow(10, H.lt + H.sd * x)));
+    const meanSurv = surv.reduce((s, v, j) => s + v * GW[j], 0);
+    const rate0 = rx.per_pb_day_unit * state.beam * state.eff / 100;
+    const sig = rx.log_sigma.map(y => Math.pow(10, y) * rate0);
+    const p = (days, k = state.chains) => {
+      let tot = 0;
+      for (let i = 0; i < sig.length; i++) { let s = 0; const base = sig[i] * days; for (let j = 0; j < surv.length; j++) s += GW[j] * pAtLeast(k, base * surv[j]); tot += rx.w_sigma[i] * s; }
+      return H.p_anchor * tot;
+    };
+    return { p, meanSurv, H };
+  }
+  const weighted = (vals) => D.hyps.reduce((s, h) => s + D.weights[h] * vals[h], 0);
+  function sigmaMedianFb(rx) { let c = 0; for (let i = 0; i < rx.log_sigma.length; i++) { c += rx.w_sigma[i]; if (c >= 0.5) return Math.pow(10, rx.log_sigma[i]) * 1000; } return NaN; }
+  const rxOf = (z) => D.reactions.filter(r => r.Z === z);
+
+  function renderElem() {
+    $("#elemSeg").innerHTML = [119, 120, 121, 122].map(z => `<button type="button" data-z="${z}" aria-pressed="${z === state.elem}">${z} ${sym(z)}</button>`).join("");
+  }
+  $("#elemSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; state.elem = +b.dataset.z; state.rx = null; renderElem(); renderPlanner(); });
+  function renderPlanner() {
+    const list = rxOf(state.elem);
+    const scored = list.map(rx => { const v = {}; for (const h of D.hyps) v[h] = model(rx, h).p(state.days); return { rx, v, w: weighted(v) }; });
+    if (!state.rx || !list.includes(state.rx)) state.rx = scored.slice().sort((a, b) => b.w - a.w)[0].rx;
+    $("#rxList").innerHTML = scored.map(({ rx, w }, i) => `<button type="button" class="rx" data-i="${i}" aria-pressed="${rx === state.rx}">
+      <span class="lab">${rx.beam} + ${rx.target}</span><span class="p">${pct(w)}</span>
+      <span class="sub"><span>σ ≈ ${sigmaMedianFb(rx).toFixed(sigmaMedianFb(rx) < 10 ? 1 : 0)} fb</span>
+      ${rx.searched ? `<span class="tag warn">searched, 0 events</span>` : ""}${rx.target_limited ? `<span class="tag bad">target only in µg</span>` : ""}</span></button>`).join("");
+    $("#rxList").onclick = (e) => { const b = e.target.closest(".rx"); if (!b) return; state.rx = list[+b.dataset.i]; renderPlanner(); };
+    renderResult(scored.find(s => s.rx === state.rx));
+  }
+  function renderResult({ rx, v, w }) {
+    const ms = {}; for (const h of D.hyps) ms[h] = model(rx, h);
+    const res = rx.hyp[state.hyp];
+    let h = `<div class="result-head"><div style="display:grid;gap:6px;min-width:0">
+        <div class="eyebrow">${rx.beam} + ${rx.target} → element ${rx.Z} · ${rx.xn}n channel · E* ≈ ${rx.E_star} MeV</div>
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><span class="big num">${pct(w)}</span>
+        <span class="muted">chance of ${state.chains} anchored chain${state.chains > 1 ? "s" : ""} in ${state.days} days,<br>averaged over shell hypotheses</span></div></div>
+      <div class="hbars" style="min-width:min(100%,320px);flex:1">${D.hyps.map(hh => `<div class="hbar">
+        <span style="font-weight:${hh === state.hyp ? 700 : 400}">${hh}</span>
+        <span class="track"><span class="fill" style="display:block;width:${v[hh] * 100}%;background:var(${HC[hh]})"></span></span>
+        <span class="num">${pct(v[hh])}</span></div>`).join("")}
+        <div class="note">Bars: probability if that hypothesis is true. Weights come from how well each one predicted heavier nuclei before seeing them.</div></div></div>
+      <div class="result-grid"><div style="display:grid;gap:8px;min-width:0"><div class="eyebrow">Probability vs campaign length</div><svg id="curve" role="img" aria-label="Discovery probability against beam days"></svg></div>
+      <div class="why"><div class="eyebrow">Why this number</div><table><thead><tr><th>Factor</th>${D.hyps.map(hh => `<th>${hh.slice(2)}</th>`).join("")}</tr></thead><tbody>
+        <tr><td>Residue</td>${D.hyps.map(hh => `<td>${rx.hyp[hh].residue}</td>`).join("")}</tr>
+        <tr><td>Half-life</td>${D.hyps.map(hh => `<td>${fmtT(rx.hyp[hh].lt)}</td>`).join("")}</tr>
+        <tr><td>Survives flight</td>${D.hyps.map(hh => `<td>${pct(ms[hh].meanSurv)}</td>`).join("")}</tr>
+        <tr><td>Chain anchors</td>${D.hyps.map(hh => `<td>${pct(rx.hyp[hh].p_anchor)}</td>`).join("")}</tr>
+      </tbody></table>
+      <p class="note">Cross section: median ${sigmaMedianFb(rx).toFixed(1)} fb, uncertain by a factor of about 4.${rx.searched ? ` Already searched with no events (90% limit ${Math.round(rx.limit_fb)} fb); the estimate includes that result.` : ""}${rx.target_limited ? ` Only micrograms of ${rx.target} exist, so the target is about 500× thinner than usual.` : ""}</p>
+      <p class="note">Chain under ${state.hyp}: ${res.path.join(" → ")}</p></div></div>`;
+    $("#result").innerHTML = h;
+    drawCurve(ms);
+  }
+  function drawCurve(ms) {
+    const svg = $("#curve"), w = 560, ht = 260, L = 44, R = 12, T = 12, B = 34;
+    svg.setAttribute("viewBox", `0 0 ${w} ${ht}`);
+    const x = (d) => L + (Math.log10(d) - 1) / (Math.log10(3000) - 1) * (w - L - R), y = (p) => T + (1 - p) * (ht - T - B);
+    let s = "";
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="${L}" x2="${w - R}" y1="${y(p)}" y2="${y(p)}" stroke="${css("--rule")}"/><text x="${L - 6}" y="${y(p) + 4}" text-anchor="end">${p * 100}%</text>`;
+    for (const d of [10, 30, 100, 300, 1000, 3000]) s += `<line x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${ht - B}" stroke="${css("--rule")}"/><text x="${x(d)}" y="${ht - B + 16}" text-anchor="middle">${d}</text>`;
+    s += `<text x="${(L + w - R) / 2}" y="${ht - 4}" text-anchor="middle">beam days (log scale)</text>`;
+    const ds = []; for (let i = 0; i <= 48; i++) ds.push(Math.pow(10, 1 + i / 48 * (Math.log10(3000) - 1)));
+    const series = {}; for (const h of D.hyps) series[h] = ds.map(d => ms[h].p(d));
+    const avg = ds.map((_, i) => D.hyps.reduce((a, h) => a + D.weights[h] * series[h][i], 0));
+    const path = (vals) => vals.map((p, i) => `${i ? "L" : "M"}${x(ds[i]).toFixed(1)},${y(p).toFixed(1)}`).join("");
+    for (const h of D.hyps) s += `<path d="${path(series[h])}" fill="none" stroke="${css(HC[h])}" stroke-width="${h === state.hyp ? 2.5 : 1.5}" opacity="${h === state.hyp ? 1 : 0.7}"/>`;
+    s += `<path d="${path(avg)}" fill="none" stroke="${css("--avg")}" stroke-width="2.5" stroke-dasharray="6 4"/>`;
+    const xd = x(Math.min(Math.max(state.days, 10), 3000));
+    s += `<line x1="${xd}" x2="${xd}" y1="${T}" y2="${ht - B}" stroke="${css("--accent")}" stroke-width="1.5"/>`;
+    // legend
+    let lx = L + 8; const items = [...D.hyps.map(h => [h, css(HC[h]), ""]), ["weighted", css("--avg"), "6 4"]];
+    for (const [lab, col, dash] of items) { s += `<line x1="${lx}" x2="${lx + 18}" y1="${T + 10}" y2="${T + 10}" stroke="${col}" stroke-width="2.5" stroke-dasharray="${dash}"/><text x="${lx + 23}" y="${T + 14}">${lab}</text>`; lx += 30 + lab.length * 7; }
+    svg.innerHTML = s;
+  }
+  const ctl = [["cDays", "days", v => `${v} d`], ["cBeam", "beam", v => `${(+v).toFixed(1)} pµA`], ["cChains", "chains", v => `${v}`], ["cEff", "eff", v => `${v}%`], ["cFlight", "flight", v => `${(+v).toFixed(1)} µs`]];
+  for (const [id, k, f] of ctl) {
+    const el = $("#" + id); el.value = state[k]; $("#v" + id.slice(1)).textContent = f(el.value);
+    el.addEventListener("input", () => { state[k] = +el.value; $("#v" + id.slice(1)).textContent = f(el.value); renderPlanner(); });
+  }
+
+  // ---------- model checks ----------
+  function renderChecks() {
+    const ink2 = css("--ink-2"), rule = css("--rule"), acc = css("--accent"), ink = css("--ink");
+    const out = [];
+    // 1. alpha laws: grouped bars of forward error
+    {
+      const [vs, udl] = V.alpha, cuts = Object.keys(vs.forward);
+      const w = 460, h = 200, L = 40, B = 34, T = 22, max = 1.4, bw = 22;
+      const y = (v) => T + (1 - v / max) * (h - T - B), gx = (i) => L + 20 + i * ((w - L - 20) / cuts.length);
+      let s = "";
+      for (const v of [0, 0.5, 1]) s += `<line x1="${L}" x2="${w}" y1="${y(v)}" y2="${y(v)}" stroke="${rule}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+      cuts.forEach((c, i) => {
+        s += `<rect x="${gx(i)}" y="${y(vs.forward[c])}" width="${bw}" height="${y(0) - y(vs.forward[c])}" fill="${ink2}" opacity="0.45" rx="2"/>`;
+        s += `<rect x="${gx(i) + bw + 4}" y="${y(udl.forward[c])}" width="${bw}" height="${y(0) - y(udl.forward[c])}" fill="${acc}" rx="2"/>`;
+        s += `<text x="${gx(i) + bw + 2}" y="${h - B + 16}" text-anchor="middle">Z&lt;${c}</text>`;
+      });
+      s += `<rect x="${L}" y="4" width="10" height="10" fill="${ink2}" opacity="0.45"/><text x="${L + 14}" y="13">Viola–Seaborg, ${vs.params} params</text>`;
+      s += `<rect x="${L + 190}" y="4" width="10" height="10" fill="${acc}"/><text x="${L + 204}" y="13">WKB law, ${udl.params} params</text>`;
+      s += `<text x="${w / 2 + 20}" y="${h - 2}" text-anchor="middle">fitted on nuclei below this Z, scored on the rest</text>`;
+      out.push(`<div class="panel check"><h3>Alpha half-lives</h3><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Forward error of two alpha-decay laws">${s}</svg>
+        <p class="take">Forward error in decades. The simpler tunnelling law extrapolates better than the six-parameter fit it replaced.</p></div>`);
+    }
+    // 2. Q-alpha calibration
+    {
+      const w = 460, h = 170, L = 70, R = 16, T = 20, max = 2.5;
+      const x = (v) => L + v / max * (w - L - R), row = (i) => T + 20 + i * 36;
+      let s = `<line x1="${x(1)}" x2="${x(1)}" y1="${T}" y2="${h - 26}" stroke="${css("--good")}" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${x(1) + 4}" y="${T + 6}">calibrated = 1</text>`;
+      for (const v of [0, 1, 2]) s += `<text x="${x(v)}" y="${h - 8}" text-anchor="middle">${v}</text>`;
+      V.mass.forEach((m, i) => {
+        s += `<text x="${L - 8}" y="${row(i) + 4}" text-anchor="end">${m.h}</text>`;
+        s += `<line x1="${x(m.z_cal)}" x2="${x(m.z_gp)}" y1="${row(i)}" y2="${row(i)}" stroke="${rule}" stroke-width="3"/>`;
+        s += `<circle cx="${x(m.z_gp)}" cy="${row(i)}" r="6" fill="${css("--bad")}"/><circle cx="${x(m.z_cal)}" cy="${row(i)}" r="6" fill="${css(HC[m.h])}"/>`;
+      });
+      out.push(`<div class="panel check"><h3>Decay-energy error bars</h3><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Forward z-score before and after calibration">${s}</svg>
+        <p class="take">Spread of forward errors in units of the claimed error bar. <span style="color:var(--bad)">Red</span>: the original error bars, about 2× too confident. Coloured: after adding an error term that grows with distance from data.</p></div>`);
+    }
+    // 3. fission shell slope
+    {
+      const w = 460, h = 190, L = 70, R = 16, T = 26, lo = -1, hi = 4;
+      const x = (v) => L + (v - lo) / (hi - lo) * (w - L - R), row = (i) => T + 18 + i * 40;
+      const [pm, ps] = V.prior;
+      let s = `<rect x="${x(pm - ps)}" y="${T - 6}" width="${x(pm + ps) - x(pm - ps)}" height="${h - T - 20}" fill="${css("--accent-soft")}"/><text x="${x(pm)}" y="${T - 10}" text-anchor="middle">assumed before: ${pm} ± ${ps}</text>`;
+      for (const v of [0, 1, 2, 3, 4]) s += `<text x="${x(v)}" y="${h - 4}" text-anchor="middle">${v}</text>`;
+      s += `<line x1="${x(0)}" x2="${x(0)}" y1="${T}" y2="${h - 18}" stroke="${rule}"/>`;
+      V.fission.forEach((f, i) => {
+        const [m, sd] = f.k_data;
+        s += `<text x="${L - 8}" y="${row(i) + 4}" text-anchor="end">${f.h}</text>`;
+        s += `<line x1="${x(m - sd)}" x2="${x(m + sd)}" y1="${row(i)}" y2="${row(i)}" stroke="${css(HC[f.h])}" stroke-width="3"/><circle cx="${x(m)}" cy="${row(i)}" r="5.5" fill="${css(HC[f.h])}"/>`;
+      });
+      out.push(`<div class="panel check"><h3>How much shells resist fission</h3><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Fitted fission shell slope against prior">${s}</svg>
+        <p class="take">Decades of fission lifetime gained per MeV of shell energy, measured from ${V.counts.sf} evaluated half-lives (±1σ). The data sit below what was assumed, so superheavy nuclei fission sooner and fewer chains reach known nuclei.</p></div>`);
+    }
+    // 4. null searches
+    {
+      const rows = V.limits.map(l => `<tr><td>${l.label.replace(" -> ", " → ")}</td><td>${l.pred_fb} fb</td><td>${l.limit_fb} fb</td><td style="color:${l.p0 < 0.16 ? css("--warn") : ink}">${pct(l.p0)}</td></tr>`).join("");
+      out.push(`<div class="panel check why"><h3>Searches that found nothing</h3>
+        <table><thead><tr><th>Search</th><th>Predicted</th><th>90% limit</th><th>P(0 events)</th></tr></thead><tbody>${rows}</tbody></table>
+        <p class="take">Each search is left out of the fit, then the model is asked how likely zero events were. Nothing is badly contradicted; the 50Ti + 249Bk result is the most informative.</p></div>`);
+    }
+    $("#checks").innerHTML = out.join("");
+  }
+
+  function renderAll() { renderHyp(); syncView(); renderChart(); renderReading(); renderPlanner(); }
+  renderElem(); renderAll(); renderChecks();
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  const rethemed = () => { renderChart(); renderPlanner(); renderChecks(); };
+  mq.addEventListener && mq.addEventListener("change", rethemed);
+  new MutationObserver(rethemed).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

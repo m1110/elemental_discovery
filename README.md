@@ -70,6 +70,17 @@ hand-typed ranges).
 * **Natural occurrence.** Survival over Solar-System ages is unlikely but not excluded by theory
   (P ≈ 0.2). The evidence against primordial superheavies is experimental.
 
+## Interactive explorer
+
+`ui/explorer.html` is a self-contained page with three parts:
+* a chart of nuclides for Z = 100–130 (click any nucleus for its predicted half-life, error
+  range and alpha chain);
+* a discovery planner with live sliders for beam, campaign length, chains needed, efficiency
+  and flight time;
+* the out-of-sample checks behind the predictions.
+
+`tools/build_ui.py` regenerates it from the models.
+
 ## Usage
 
 ```bash
@@ -80,6 +91,7 @@ python -m elemental_discovery nucleus 120 296 --hypothesis Z=120   # decay chain
 python -m elemental_discovery element 119        # atomic structure, X-ray fingerprint
 python -m elemental_discovery discover 120       # probability of discovery for every route
 python -m pytest -q                              # validation tests against known physics
+python tools/build_ui.py                         # rebuild the interactive explorer (ui/explorer.html)
 ```
 
 The first run spends about 20 s calibrating the Dirac X-ray model and about 30 s
