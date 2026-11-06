@@ -57,9 +57,14 @@ hand-typed ranges).
   odd nucleon type, not the assumed 3.
 * **Best routes, as one-campaign discovery probabilities** (300 days, 3 anchored chains,
   6 pµA, averaged over shell hypotheses): element 119 via 50Ti + 249Bk or 51V + 248Cm (≈ 0.6),
-  element 120 via 50Ti + 251Cf (≈ 0.4). These are lower than in v0.2 because faster fission
+  element 120 via **54Cr + 248Cm** (≈ 0.6). These are lower than in v0.2 because faster fission
   now competes with alpha decay, so chains anchor to known nuclei less often. Es-target routes
   are target-limited (≤ 0.2).
+* **Short chains beat big cross sections for element 120.** 54Cr + 248Cm has a cross section
+  about 5× smaller than 50Ti + 251Cf (14 vs 70 fb). Its residue, 298Ubn, is one alpha decay
+  from known 294Og, so the chain anchors with probability 0.81–0.97 under every shell
+  hypothesis, against 0.44–0.89. This holds even after its earlier null search, and it assumes
+  the 4n evaporation channel.
 * **Separator flight losses.** Averaged over the half-life uncertainty, about half of 296Ubn
   atoms decay before reaching the detector if the shell is at Z = 114 (≈ 2 % under Z = 120/126).
 * **Shell hypotheses.** The model variant with its shell at Z = 126 predicts heavier nuclei best,

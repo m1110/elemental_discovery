@@ -233,10 +233,45 @@ def _section_out_of_sample(w):
       "an extrapolation, not a measurement.\n")
 
 
+def _route_insight(w, rows, hs):
+    """Explain, from the numbers, when the best route is not the biggest cross section."""
+    for z in sorted({r["Z"] for r in rows}):
+        rz = [r for r in rows if r["Z"] == z]
+        best = max(rz, key=lambda r: r["p_discovery_avg"])
+        # compare with the most productive route whose target exists in quantity
+        usable = [r for r in rz if r["target_mg_cm2"] >= 0.1]
+        if not usable:
+            continue
+        big = max(usable, key=lambda r: r["sigma_median_fb"])
+        mean_anchor = lambda r: sum(r["p_anchor"][h] for h in hs) / len(hs)  # noqa: E731
+        if (best is big or best["sigma_median_fb"] > big["sigma_median_fb"] / 2
+                or mean_anchor(best) <= mean_anchor(big)):
+            continue
+        unknown = len(best["path_Z114"]) - 1
+        w(f"**Element {z}: the best route is not the most productive one.** {best['reaction']} has a "
+          f"median cross section of only {best['sigma_median_fb']:.0f} fb, against "
+          f"{big['sigma_median_fb']:.0f} fb for {big['reaction']}, yet it gives the higher discovery "
+          f"probability ({best['p_discovery_avg']:.0%} vs {big['p_discovery_avg']:.0%}). Its residue "
+          f"{best['residue']} is {unknown} alpha decay{'s' if unknown > 1 else ''} from known "
+          f"{best['path_Z114'][-1]}, so its chain anchors with probability "
+          + "/".join(f"{best['p_anchor'][h]:.2f}" for h in hs)
+          + f" under shells at {'/'.join(h[2:] for h in hs)}, against "
+          + "/".join(f"{big['p_anchor'][h]:.2f}" for h in hs)
+          + f" for {big['reaction']}. "
+          "A short chain into known territory is worth more than raw yield when every extra new "
+          "link is another chance to fission first, and it holds up whichever shell hypothesis is "
+          "true."
+          + (" This reaction was searched before without events, but at an exposure too small "
+             "to rule this out, and the probability already includes that null result."
+             if best["past_null_exposure"] else "")
+          + " The residue assumes a single evaporation channel; the neighbouring channel's residue "
+          "should be checked before planning beam time.\n")
+
+
 def _section_calculus(w):
     setup = calculus.Setup()
     days = 300
-    rows = calculus.discovery_table(campaign_days=days, setup=setup)
+    rows = calculus.discovery_table(campaign_days=days, setup=setup, per_z=6)
     w("## 6. How likely is a discovery? (the discovery calculus)\n")
     w("Point estimates of \"beam days\" are biased in the optimistic direction. The cross section is "
       "log-normal, so its mean exceeds its median. The half-life is uncertain, so the fraction of "
@@ -271,6 +306,7 @@ def _section_calculus(w):
             best[r["Z"]] = r
     w("\nBest route per element, by the weighted discovery probability in one campaign: "
       + "; ".join(f"Z={z}: {r['reaction']} ({r['p_discovery_avg']:.0%})" for z, r in best.items()) + ".\n")
+    _route_insight(w, rows, hs)
     w("\"Never\" means that even unlimited beam time cannot reach 50 %: with the probability left "
       "after flight losses and the chance that the chain fails to anchor, discovery stays below "
       "even odds. Reactions already searched without success are penalised exactly once, through "

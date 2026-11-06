@@ -147,17 +147,28 @@ Campaign: 300 beam days, k = 3 anchored chains, 6 pµA, 50% efficiency, 1 µs fl
 | 119 | 48Ca + 254Es | 298Uue | 883 | no | 97% | 0.96/0.85/0.69 | 0.25/0.23/0.18 | **0.19** | 824 |
 | 119 | 50Ti + 249Bk | 295Uue | 23 | yes, 0 events | 96% | 0.57/0.97/0.64 | 0.50/0.85/0.57 | **0.58** | 297 |
 | 119 | 51V + 248Cm | 295Uue | 34 | no | 96% | 0.57/0.97/0.64 | 0.50/0.85/0.57 | **0.58** | 307 |
+| 119 | 54Cr + 243Am | 294Uue | 20 | no | 96% | 0.70/0.00/0.53 | 0.56/0.00/0.43 | **0.41** | 178 |
 | 120 | 50Ti + 251Cf | 297Ubn | 70 | no | 78% | 0.61/0.89/0.44 | 0.52/0.84/0.41 | **0.43** | 219 |
 | 120 | 50Ti + 249Cf | 296Ubn | 30 | yes, 0 events | 52% | 0.49/0.86/0.33 | 0.30/0.77/0.30 | **0.32** | never |
 | 120 | 51V + 249Bk | 296Ubn | 24 | no | 52% | 0.49/0.86/0.33 | 0.27/0.71/0.28 | **0.29** | never |
+| 120 | 54Cr + 248Cm | 298Ubn | 14 | yes, 0 events | 73% | 0.94/0.97/0.81 | 0.56/0.72/0.60 | **0.61** | 205 |
+| 120 | 58Fe + 244Pu | 298Ubn | 4 | yes, 0 events | 73% | 0.94/0.97/0.81 | 0.34/0.45/0.38 | **0.38** | 772 |
+| 120 | 58Fe + 242Pu | 297Ubn | 4 | no | 78% | 0.61/0.86/0.33 | 0.24/0.40/0.16 | **0.17** | 6281 |
 | 121 | 50Ti + 254Es | 300Ubu | 52 | no | 84% | 0.74/0.95/0.61 | 0.01/0.01/0.01 | **0.01** | 41620 |
 | 121 | 51V + 251Cf | 299Ubu | 17 | no | 76% | 0.55/0.84/0.47 | 0.35/0.61/0.36 | **0.37** | 42087 |
 | 121 | 51V + 249Cf | 297Ubu | 16 | no | 57% | 0.00/0.00/0.00 | 0.00/0.00/0.00 | **0.00** | never |
+| 121 | 54Cr + 249Bk | 299Ubu | 11 | no | 76% | 0.55/0.96/0.50 | 0.31/0.63/0.35 | **0.36** | 77766 |
+| 121 | 58Fe + 243Am | 298Ubu | 2 | no | 65% | 0.69/0.84/0.47 | 0.19/0.30/0.19 | **0.19** | 9630 |
 | 122 | 51V + 254Es | 301Ubb | 13 | no | 78% | 0.57/0.89/0.31 | 0.00/0.00/0.00 | **0.00** | never |
 | 122 | 54Cr + 251Cf | 302Ubb | 8 | no | 74% | 0.84/0.89/0.31 | 0.41/0.42/0.20 | **0.20** | 595 |
 | 122 | 54Cr + 249Cf | 300Ubb | 7 | no | 58% | 0.45/0.86/0.27 | 0.18/0.27/0.17 | **0.17** | never |
+| 122 | 58Fe + 248Cm | 302Ubb | 2 | no | 74% | 0.84/0.97/0.57 | 0.22/0.23/0.20 | **0.20** | 2654 |
+| 122 | 64Ni + 244Pu | 305Ubb | 1 | no | 88% | 0.62/0.77/0.25 | 0.12/0.13/0.06 | **0.06** | 26363 |
+| 122 | 64Ni + 242Pu | 303Ubb | 1 | no | 86% | 0.84/0.85/0.38 | 0.16/0.15/0.08 | **0.09** | 3859 |
 
-Best route per element, by the weighted discovery probability in one campaign: Z=119: 50Ti + 249Bk (58%); Z=120: 50Ti + 251Cf (43%); Z=121: 51V + 251Cf (37%); Z=122: 54Cr + 251Cf (20%).
+Best route per element, by the weighted discovery probability in one campaign: Z=119: 50Ti + 249Bk (58%); Z=120: 54Cr + 248Cm (61%); Z=121: 51V + 251Cf (37%); Z=122: 54Cr + 251Cf (20%).
+
+**Element 120: the best route is not the most productive one.** 54Cr + 248Cm has a median cross section of only 14 fb, against 70 fb for 50Ti + 251Cf, yet it gives the higher discovery probability (61% vs 43%). Its residue 298Ubn is 1 alpha decay from known 294Og, so its chain anchors with probability 0.94/0.97/0.81 under shells at 114/120/126, against 0.61/0.89/0.44 for 50Ti + 251Cf. A short chain into known territory is worth more than raw yield when every extra new link is another chance to fission first, and it holds up whichever shell hypothesis is true. This reaction was searched before without events, but at an exposure too small to rule this out, and the probability already includes that null result. The residue assumes a single evaporation channel; the neighbouring channel's residue should be checked before planning beam time.
 
 "Never" means that even unlimited beam time cannot reach 50 %: with the probability left after flight losses and the chance that the chain fails to anchor, discovery stays below even odds. Reactions already searched without success are penalised exactly once, through their own exposure. Einsteinium routes are limited by the target, not the physics.
 

@@ -143,7 +143,9 @@ section.band { padding-block: 28px; border-top: 1px solid var(--rule); display: 
 .ctl label .num { font-weight: 500; color: var(--accent); }
 .ctl input[type=range] { width: 100%; accent-color: var(--accent); }
 .ctl .hint { font-size: var(--s-xs); color: var(--ink-2); }
-.rx-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.rx-list { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .rx-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .rx-list { grid-template-columns: minmax(0, 1fr); } }
 .rx { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; text-align: left; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--rule); background: var(--surface); cursor: pointer; }
 .rx:hover { border-color: var(--ink-3); }
 .rx[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
@@ -180,6 +182,54 @@ section.band { padding-block: 28px; border-top: 1px solid var(--rule); display: 
 .check .take { font-size: var(--s-sm); }
 footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: grid; gap: 8px; font-size: var(--s-sm); color: var(--ink-2); }
 @media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.25s ease; } }
+/* guided layer */
+nav.jump { display: flex; flex-wrap: wrap; gap: 6px 4px; padding-block: 4px 0; }
+nav.jump a { color: var(--ink-2); text-decoration: none; font-size: var(--s-sm); padding: 6px 10px; border-radius: 8px; }
+nav.jump a:hover { color: var(--ink); background: var(--surface); }
+.start-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .start-grid { grid-template-columns: minmax(0, 1fr); } }
+.prose { display: grid; gap: 12px; font-size: 1.05rem; }
+.prose p { max-width: 64ch; }
+.ideas { display: grid; gap: 12px; }
+.idea { padding: 16px 18px; display: grid; gap: 6px; }
+.idea h3 { font-size: 1.1rem; font-weight: 700; }
+.idea p { font-size: var(--s-sm); color: var(--ink-2); }
+.flow-card { padding: 18px; display: grid; gap: 12px; }
+#flow { display: block; width: 100%; min-width: 720px; height: auto; }
+#flow text { font-family: var(--f-body); fill: var(--ink); font-size: 13px; }
+#flow .t-small { fill: var(--ink-2); font-size: 11.5px; }
+#flow .t-num { font-family: var(--f-data); fill: var(--accent); font-size: 12px; font-weight: 500; }
+.tour { display: flex; flex-wrap: wrap; gap: 8px; }
+.tour button { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: var(--s-sm); }
+.tour button:hover { border-color: var(--accent); color: var(--accent); }
+.tour button::before { content: "→ "; color: var(--accent); }
+.term { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: help; text-decoration: underline dotted var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.term:hover { color: var(--accent); }
+.pop { position: fixed; z-index: 30; max-width: min(340px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(10, 15, 30, 0.18); font-size: var(--s-sm); display: grid; gap: 4px; }
+.pop b { font-family: var(--f-display); font-size: 1.05rem; }
+.plain { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: var(--s-sm); }
+.steps { display: grid; gap: 14px; counter-reset: step; }
+.step { padding: 18px; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 4px 14px; }
+.step::before { counter-increment: step; content: counter(step); grid-row: 1 / span 3; width: 2.2rem; height: 2.2rem; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-family: var(--f-display); font-weight: 700; }
+.step h3 { font-size: 1.15rem; font-weight: 700; }
+.step p { color: var(--ink-2); }
+details { border-top: 1px solid var(--rule); padding-top: 8px; margin-top: 6px; }
+details summary { cursor: pointer; font-size: var(--s-sm); font-weight: 700; color: var(--accent); }
+details .math { font-family: var(--f-data); font-size: var(--s-xs); background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; white-space: pre; }
+details p { font-size: var(--s-sm); margin-top: 6px; }
+.involve { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.involve .panel { padding: 18px; display: grid; gap: 8px; align-content: start; }
+.involve ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 6px; font-size: var(--s-sm); }
+.involve h3 { font-size: 1.1rem; font-weight: 700; }
+code, .code { font-family: var(--f-data); font-size: 0.85em; background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 1px 5px; }
+.gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 4px 28px; margin: 0; }
+.gloss div { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.gloss dt { font-weight: 700; }
+.gloss dd { margin: 2px 0 0; color: var(--ink-2); font-size: var(--s-sm); }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+section[id] { scroll-margin-top: 12px; }
+
 </style>
 
 <div class="wrap">
@@ -191,17 +241,50 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
         <p class="lede">Predicted half-lives and decay chains for nuclei no one has made yet, and the odds that a real experiment would discover the next element. Every prediction carries an error bar checked against nuclei the model had not seen.</p>
       </div>
       <div class="hyp">
-        <div class="eyebrow">Next magic proton number</div>
+        <div class="eyebrow">Next <button type="button" class="term" data-term="magic">magic</button> proton number · <button type="button" class="term" data-term="weight">weight</button></div>
         <div class="seg" id="hypSeg" role="group" aria-label="Proton shell hypothesis"></div>
       </div>
     </div>
     <div class="facts" id="facts"></div>
+    <nav class="jump" aria-label="Sections">
+      <a href="#start">Start here</a><a href="#chart-sec">The chart</a><a href="#plan">Plan an experiment</a>
+      <a href="#how">How it works</a><a href="#trust">Can we trust it?</a><a href="#involved">Get involved</a><a href="#glossary">Glossary</a>
+    </nav>
   </header>
 
-  <section class="band" aria-labelledby="h-chart">
+  <section class="band" id="start" aria-labelledby="h-start">
+    <div class="band-head">
+      <div class="eyebrow">New to this? Start here</div>
+      <h2 id="h-start">How a new element gets made, and proven</h2>
+    </div>
+    <div class="start-grid">
+      <div class="prose">
+        <p>An element is defined by one number: how many protons sit in its nucleus, its <button type="button" class="term" data-term="Z">atomic number Z</button>. The periodic table currently ends at oganesson, Z = 118. Nothing heavier exists in nature, so every new element has to be built by hand, one atom at a time.</p>
+        <p>The recipe is to fire a beam of medium-weight nuclei (titanium, chromium) at a target made of a heavy, rare element (curium, californium) so that the two fuse. Making a single atom can take weeks of beam, and the atom then lives for millionths of a second.</p>
+        <p>Nobody sees the new atom directly. What a detector sees is the atom's <button type="button" class="term" data-term="alpha">alpha decays</button>, one after another, until the chain reaches a nucleus scientists have already seen before. That link to known territory is the proof. This page predicts how long each unknown nucleus lives, whether its chain reaches known ground, and how likely a real experiment is to succeed.</p>
+        <div class="tour" aria-label="Guided examples">
+          <button type="button" data-tour="og">Look at oganesson-294, a measured nucleus</button>
+          <button type="button" data-tour="ubn">Look at element 120's best candidate</button>
+          <button type="button" data-tour="hyp">See what changes if the magic number is 120</button>
+          <button type="button" data-tour="cr">See why 54Cr + 248Cm is the best bet for 120</button>
+        </div>
+      </div>
+      <div class="ideas">
+        <div class="panel idea"><h3>Half-lives decide everything</h3><p>The <button type="button" class="term" data-term="halflife">half-life</button> is the time for half of a sample to decay. If it is shorter than the ~1 µs an atom needs to fly to the detector, the atom is lost. If the nucleus <button type="button" class="term" data-term="sf">fissions</button> instead of alpha-decaying, its chain breaks before reaching known nuclei.</p></div>
+        <div class="panel idea"><h3>The island of stability</h3><p>Nuclei with certain "<button type="button" class="term" data-term="magic">magic</button>" numbers of protons or neutrons are extra stable. Theory predicts an island of longer-lived superheavy nuclei near 184 neutrons, but no one agrees on its magic proton number (114, 120 or 126), so this page shows all three.</p></div>
+        <div class="panel idea"><h3>Odds, not certainties</h3><p>Every prediction is an extrapolation into unexplored territory, so each comes with an error bar. The planner folds every uncertainty into one honest number: the chance that a real experiment succeeds.</p></div>
+      </div>
+    </div>
+    <div class="panel flow-card">
+      <div class="eyebrow">The experiment, step by step</div>
+      <div class="scroll-x"><svg id="flow" viewBox="0 0 1072 210" role="img" aria-label="Diagram: beam hits target, nuclei fuse and shed neutrons, the separator steers survivors to a detector, and the decay chain is traced to a known nucleus."></svg></div>
+    </div>
+  </section>
+
+  <section class="band" id="chart-sec" aria-labelledby="h-chart">
     <div class="band-head">
       <h2 id="h-chart">Chart of nuclides, Z 100–130</h2>
-      <p class="muted">Protons up, neutrons across. Outlined cells are nuclides that have been made and measured; everything else is a prediction. Hover for a quick reading, click for the full one.</p>
+      <p class="muted">Each square is one <button type="button" class="term" data-term="nuclide">nuclide</button>: protons (<button type="button" class="term" data-term="Z">Z</button>) up, neutrons (<button type="button" class="term" data-term="N">N</button>) across. Outlined squares have been made and measured; everything else is a prediction. Colour by decay mode to see where chains break, by half-life to look for the <button type="button" class="term" data-term="island">island of stability</button>, or by uncertainty to see how far the model is guessing. Hover for a quick reading, click for the full one.</p>
     </div>
     <div class="chart-layout">
       <div class="panel chart-card">
@@ -224,10 +307,10 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
     </div>
   </section>
 
-  <section class="band" aria-labelledby="h-plan">
+  <section class="band" id="plan" aria-labelledby="h-plan">
     <div class="band-head">
       <h2 id="h-plan">Discovery planner</h2>
-      <p class="muted">The chance that one campaign records enough decay chains, each traced back to a known nucleus, to claim a new element. It accounts for an uncertain cross section, atoms that decay in flight, and chains that fission before they reach known territory.</p>
+      <p class="muted">The chance that one experiment records enough <button type="button" class="term" data-term="anchor">anchored decay chains</button> to claim a new element. Move the sliders to see what a lab can control. Three things can still make it fail: the <button type="button" class="term" data-term="xs">cross section</button> may be smaller than hoped, atoms may decay before reaching the detector, and chains may <button type="button" class="term" data-term="sf">fission</button> before they reach known territory.</p>
     </div>
     <div class="planner">
       <div class="panel controls">
@@ -239,14 +322,14 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
           <input type="range" id="cDays" min="30" max="1000" step="10" value="300"></div>
         <div class="ctl"><label for="cBeam">Beam intensity <span class="num" id="vBeam"></span></label>
           <input type="range" id="cBeam" min="0.5" max="10" step="0.5" value="6">
-          <span class="hint">Particle microamperes on target. 6 pµA is an optimistic modern figure.</span></div>
+          <span class="hint">In <button type="button" class="term" data-term="pua">pµA</button>. 6 pµA is an optimistic modern figure.</span></div>
         <div class="ctl"><label for="cChains">Chains needed <span class="num" id="vChains"></span></label>
           <input type="range" id="cChains" min="1" max="6" step="1" value="3"></div>
         <div class="ctl"><label for="cEff">Separator efficiency <span class="num" id="vEff"></span></label>
           <input type="range" id="cEff" min="10" max="80" step="5" value="50"></div>
         <div class="ctl"><label for="cFlight">Flight time to detector <span class="num" id="vFlight"></span></label>
           <input type="range" id="cFlight" min="0.2" max="5" step="0.1" value="1">
-          <span class="hint">Atoms that decay before arriving are lost.</span></div>
+          <span class="hint">Time to cross the <button type="button" class="term" data-term="separator">separator</button>. Atoms that decay before arriving are lost.</span></div>
       </div>
       <div style="display:grid;gap:16px;min-width:0">
         <div class="ctl"><div class="eyebrow">Reaction · probability for this campaign</div>
@@ -256,12 +339,91 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
     </div>
   </section>
 
-  <section class="band" aria-labelledby="h-checks">
+    <section class="band" id="how" aria-labelledby="h-how">
+    <div class="band-head">
+      <h2 id="h-how">How the model works</h2>
+      <p class="muted">Four steps, each one a physics law fitted to measured data. Open "Show the maths" for the equations and how each step was checked.</p>
+    </div>
+    <div class="steps">
+      <div class="panel step"><h3>Weigh the nucleus</h3>
+        <p>How tightly a nucleus is bound sets how much energy it releases when it decays (its <button type="button" class="term" data-term="qalpha">Q-alpha</button>). The model treats the nucleus as a charged liquid drop, then adds a correction for <button type="button" class="term" data-term="magic">shell effects</button>: the extra stability near magic numbers. It is fitted to 463 measured alpha decays.</p>
+        <details><summary>Show the maths</summary>
+          <div class="math">B(Z,N) = a_v A − a_s A^(2/3) − a_c Z(Z−1)/A^(1/3) − a_sym (N−Z)²/A + … − E_shell(Z,N)
+Q_α = B(daughter) + B(⁴He) − B(parent)</div>
+          <p>A Gaussian-process correction pulls predictions onto nearby measurements. Its error bar then grows with the distance d from the nearest measured nucleus, σ² = σ_GP² + (k·d)², with k fitted so that predictions for unseen heavier nuclei have honest error bars.</p></details></div>
+      <div class="panel step"><h3>Turn energy into a lifetime</h3>
+        <p>An alpha particle escapes by quantum tunnelling through the nucleus's electric barrier, so more energy means a much shorter life. Fission competes, and shell effects hold it back. Both laws are fitted to measured half-lives.</p>
+        <details><summary>Show the maths</summary>
+          <div class="math">log₁₀ T_α = a·χ + b·ρ + c + h·[odd]      χ = Z_α Z_d √(A_red/Q),  ρ = √(A_red Z_α Z_d (A_d^⅓ + A_α^⅓))
+log₁₀ T_SF = s₀ + s₁u + s₂u² + k·(−E_shell) + h_f·n_odd,   u = Z²/A − 37.5</div>
+          <p>The alpha law is the WKB tunnelling exponent with four fitted constants. It replaced a six-parameter formula because it predicts unseen nuclei better. Each law reports its predictive error σ² = s² + xᵀCx, which grows automatically when it extrapolates.</p></details></div>
+      <div class="panel step"><h3>Learn from past experiments</h3>
+        <p>How often a beam and target fuse into a surviving atom (the <button type="button" class="term" data-term="xs">cross section</button>) falls steeply as the nuclei get heavier. The trend is fitted to every successful experiment and also to the searches that found nothing, which are real evidence too.</p>
+        <details><summary>Show the maths</summary>
+          <div class="math">log₁₀ σ = c₀ + c₁·x_m + ε,   ε ~ Normal(0, s²)
+a 90% upper limit σ_lim means exposure L = ln 10 / σ_lim
+P(0 events) = E[ exp(−L·σ) ]</div>
+          <p>A failed search is a count of zero over a known exposure, so it enters the fit through the Poisson probability of seeing nothing. A reaction that was already tried updates its own estimate downwards, exactly once.</p></details></div>
+      <div class="panel step"><h3>Combine into one chance of success</h3>
+        <p>An experiment succeeds if it records enough decay chains that each reach a known nucleus. That needs a big enough cross section, atoms that survive the flight to the detector, and chains that alpha-decay all the way down.</p>
+        <details><summary>Show the maths</summary>
+          <div class="math">P(discovery in D days) = P_anchor · E[ P_Poisson(≥ k ; λ·D) ]
+λ = σ · beam · target · efficiency · 2^(−t_flight / T)
+P_anchor = Π over new links of P(alpha beats fission)</div>
+          <p>The average runs over the uncertain cross section and half-life, using Gauss–Hermite quadrature. Your browser runs this calculation live as you move the planner's sliders.</p></details></div>
+    </div>
+  </section>
+  <section class="band" id="trust" aria-labelledby="h-checks">
     <div class="band-head">
       <h2 id="h-checks">How much to trust it</h2>
-      <p class="muted">Each law was fitted on lighter nuclei and asked to predict heavier ones it had not seen, the way the elements were actually discovered.</p>
+      <p class="muted">Each law was put through a <button type="button" class="term" data-term="forward">forward test</button>: fitted on lighter nuclei, then asked to predict heavier ones it had not seen, the way the elements were actually discovered. A model that passes this test has earned its error bars.</p>
     </div>
     <div class="checks" id="checks"></div>
+  </section>
+
+  <section class="band" id="involved" aria-labelledby="h-inv">
+    <div class="band-head">
+      <h2 id="h-inv">Getting into this work</h2>
+      <p class="muted">Superheavy-element research mixes accelerator experiments, nuclear theory, statistics and chemistry. You can contribute from any of these directions.</p>
+    </div>
+    <div class="involve">
+      <div class="panel"><h3>Where it happens</h3>
+        <ul><li>JINR Flerov Laboratory, Dubna (Russia), where elements 114–118 were first made</li>
+          <li>GSI / FAIR, Darmstadt (Germany), home of the 119 and 120 searches with TASCA and SHIP</li>
+          <li>RIKEN Nishina Center (Japan), which discovered nihonium</li>
+          <li>Lawrence Berkeley National Laboratory (USA), which made livermorium with a titanium beam in 2024</li></ul></div>
+      <div class="panel"><h3>Useful background</h3>
+        <ul><li>Nuclear physics: the liquid-drop model, shell structure, quantum tunnelling</li>
+          <li>Statistics: Poisson counting, likelihoods, honest error bars</li>
+          <li>Programming: Python and NumPy are enough to read every line of this model</li>
+          <li>Chemistry, if you want to test where a new element sits in the periodic table</li></ul></div>
+      <div class="panel"><h3>The data behind it</h3>
+        <ul><li><b>NUBASE2020</b>: half-lives, decay modes and masses for every known nucleus (Kondev et al., 2021)</li>
+          <li><b>AME2020</b>: the atomic mass evaluation, including Q-values</li>
+          <li><b>ENSDF</b>: the IAEA's detailed nuclear structure files</li>
+          <li>The original discovery papers for cross sections and null searches</li></ul></div>
+      <div class="panel"><h3>Open problems to try</h3>
+        <ul><li>Find a fission law that predicts unseen nuclei well (the best is still ±2.4 decades)</li>
+          <li>Add Q-values for odd nuclei directly from AME2020</li>
+          <li>Sum over neighbouring evaporation channels (3n and 4n) instead of picking one</li>
+          <li>Model the correlation between a residue's half-life and its chain's survival</li></ul></div>
+      <div class="panel"><h3>Run it yourself</h3>
+        <ul><li><code>pip install -r requirements.txt</code></li>
+          <li><code>python -m elemental_discovery discover 120</code></li>
+          <li><code>python -m pytest -q</code> runs the checks against known physics</li>
+          <li><code>python tools/build_ui.py</code> rebuilds this page</li></ul>
+        <p class="note">All of it lives in the elemental_discovery repository: <code>docs/REPORT.md</code> has every result and <code>docs/AUDIT.md</code> explains each modelling choice.</p></div>
+      <div class="panel"><h3>Further reading</h3>
+        <ul><li>Oganessian &amp; Utyonkov, "Super-heavy element research", Rep. Prog. Phys. 78, 036301 (2015)</li>
+          <li>Hofmann et al., criteria for discovering new elements, Pure Appl. Chem. 90, 1773 (2018)</li>
+          <li>Qi et al., the universal alpha-decay law, Phys. Rev. Lett. 103, 072501 (2009)</li></ul></div>
+    </div>
+  </section>
+
+  <section class="band" id="glossary" aria-labelledby="h-gloss">
+    <div class="band-head"><h2 id="h-gloss">Glossary</h2>
+      <p class="muted">Every underlined term on this page opens one of these definitions.</p></div>
+    <dl class="gloss" id="glossList"></dl>
   </section>
 
   <footer>
@@ -444,8 +606,10 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
             ? `Probability every new link alpha-decays rather than fissions: <b class="num">${pct(ch.p)}</b>. Under the discovery criteria the chain must reach a known nucleus like this.`
             : `This chain does not reach a measured nucleus within the chart, so a discovery here would need another way to prove Z, such as X-ray identification.`}</p></div>`;
       }
-      h += `<p class="note">Uncertainties are 1σ. Half-life errors are in decades, and they widen with distance from measured nuclei.</p>`;
+      h += `<p class="note">Uncertainties are ${term("sigma", "1σ")}. Half-life errors are in ${term("decade", "decades")}, and they widen with distance from measured nuclei.</p>`;
     } else if (!m) h += `<p class="muted">No prediction for this cell.</p>`;
+    const pl = plainReading(z, n, c, m);
+    if (pl) h = h.replace("</span></div>", `</span></div><p class="plain">${pl}</p>`);
     $("#reading").innerHTML = h;
   }
 
@@ -499,9 +663,9 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
       <div class="result-grid"><div style="display:grid;gap:8px;min-width:0"><div class="eyebrow">Probability vs campaign length</div><svg id="curve" role="img" aria-label="Discovery probability against beam days"></svg></div>
       <div class="why"><div class="eyebrow">Why this number</div><table><thead><tr><th>Factor</th>${D.hyps.map(hh => `<th>${hh.slice(2)}</th>`).join("")}</tr></thead><tbody>
         <tr><td>Residue</td>${D.hyps.map(hh => `<td>${rx.hyp[hh].residue}</td>`).join("")}</tr>
-        <tr><td>Half-life</td>${D.hyps.map(hh => `<td>${fmtT(rx.hyp[hh].lt)}</td>`).join("")}</tr>
-        <tr><td>Survives flight</td>${D.hyps.map(hh => `<td>${pct(ms[hh].meanSurv)}</td>`).join("")}</tr>
-        <tr><td>Chain anchors</td>${D.hyps.map(hh => `<td>${pct(rx.hyp[hh].p_anchor)}</td>`).join("")}</tr>
+        <tr><td>${term("halflife", "Half-life")}</td>${D.hyps.map(hh => `<td>${fmtT(rx.hyp[hh].lt)}</td>`).join("")}</tr>
+        <tr><td>${term("separator", "Survives flight")}</td>${D.hyps.map(hh => `<td>${pct(ms[hh].meanSurv)}</td>`).join("")}</tr>
+        <tr><td>${term("anchor", "Chain anchors")}</td>${D.hyps.map(hh => `<td>${pct(rx.hyp[hh].p_anchor)}</td>`).join("")}</tr>
       </tbody></table>
       <p class="note">Cross section: median ${sigmaMedianFb(rx).toFixed(1)} fb, uncertain by a factor of about 4.${rx.searched ? ` Already searched with no events (90% limit ${Math.round(rx.limit_fb)} fb); the estimate includes that result.` : ""}${rx.target_limited ? ` Only micrograms of ${rx.target} exist, so the target is about 500× thinner than usual.` : ""}</p>
       <p class="note">Chain under ${state.hyp}: ${res.path.join(" → ")}</p></div></div>`;
@@ -598,9 +762,107 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); display: g
   }
 
   function renderAll() { renderHyp(); syncView(); renderChart(); renderReading(); renderPlanner(); }
-  renderElem(); renderAll(); renderChecks();
+  // ---------- guided layer: glossary, popovers, tour, diagram ----------
+  const GLOSS = {
+    Z: ["Atomic number (Z)", "The number of protons in a nucleus. It decides which element an atom is: 118 protons is oganesson, 120 would be element 120."],
+    N: ["Neutron number (N)", "The number of neutrons. Atoms of one element with different N are its isotopes, written with the total A = Z + N, as in oganesson-294."],
+    nuclide: ["Nuclide", "One specific nucleus: a given Z and N together. The chart of nuclides plots every one of them, protons up and neutrons across."],
+    halflife: ["Half-life", "The time after which half of a sample has decayed. Superheavy nuclei have half-lives from nanoseconds to seconds."],
+    decade: ["Decade (of half-life)", "A factor of 10. An error of ±1 decade on 1 µs means anything from 0.1 µs to 10 µs."],
+    alpha: ["Alpha decay", "The nucleus spits out a helium-4 nucleus (2 protons, 2 neutrons), so Z drops by 2. A string of these forms a decay chain that can be traced to a known nucleus."],
+    sf: ["Spontaneous fission", "The nucleus splits into two large fragments. This ends a decay chain, and fission fragments do not say which element produced them."],
+    qalpha: ["Q-alpha", "The energy released in alpha decay, in MeV. A few MeV more energy shortens the half-life by many decades, because the alpha particle tunnels out far more easily."],
+    magic: ["Magic numbers and shells", "Protons and neutrons fill energy shells like electrons in atoms. A full shell (a magic number such as 82 protons or 126 neutrons) makes a nucleus extra stable. The next magic proton number beyond 82 is still disputed: 114, 120 or 126."],
+    island: ["Island of stability", "A predicted region of longer-lived superheavy nuclei around the next magic numbers, near N = 184. Fusion experiments cannot yet reach that many neutrons."],
+    xs: ["Cross section (fb)", "How likely one beam particle is to produce one surviving atom, expressed as an effective target area. 1 femtobarn (fb) is 10⁻³⁹ cm². At 10 fb a long experiment makes only a handful of atoms."],
+    pua: ["Beam intensity (pµA)", "Particle-microamperes: 1 pµA is about 6 × 10¹² beam nuclei per second hitting the target."],
+    separator: ["Separator", "Magnets and gas that steer the rare fused atoms away from the intense beam and onto a silicon detector. The trip takes about a microsecond."],
+    anchor: ["Anchored chain", "A decay chain that reaches a nucleus already measured. Matching its known energy and half-life proves which element started the chain, which is the strongest evidence the discovery rules accept."],
+    sigma: ["1σ error bar", "A range that should contain the true value about two times out of three. This model's error bars were checked on nuclei it had not seen."],
+    forward: ["Forward test", "A check that mimics discovery history: fit the model on lighter nuclei only, then see how well it predicts heavier ones. That is the honest test for predicting new elements."],
+    hyp: ["Shell hypothesis", "Which proton number is assumed to be the next magic number (114, 120 or 126). The model is fitted separately under each one, and the answers are compared."],
+    weight: ["Hypothesis weight", "How much each hypothesis counts in the average, based on how well it predicted heavier nuclei before seeing them. It describes this model, not proof of a magic number."],
+  };
+  const pop = document.createElement("div"); pop.className = "pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); document.body.appendChild(pop);
+  let popFor = null;
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest(".term");
+    if (t && GLOSS[t.dataset.term]) {
+      if (popFor === t && !pop.hidden) { pop.hidden = true; popFor = null; return; }
+      const [name, def] = GLOSS[t.dataset.term];
+      pop.innerHTML = `<b>${name}</b><span>${def}</span><a href="#glossary" style="color:var(--accent);font-size:var(--s-xs)">All terms</a>`;
+      pop.hidden = false; popFor = t; popY = scrollY;
+      const r = t.getBoundingClientRect();
+      const x = Math.max(16, Math.min(r.left, innerWidth - pop.offsetWidth - 16));
+      const below = r.bottom + 8 + pop.offsetHeight < innerHeight;
+      pop.style.left = x + "px"; pop.style.top = (below ? r.bottom + 8 : r.top - pop.offsetHeight - 8) + "px";
+      return;
+    }
+    if (!e.target.closest(".pop")) { pop.hidden = true; popFor = null; }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { pop.hidden = true; popFor && popFor.focus(); popFor = null; } });
+  let popY = 0;
+  addEventListener("scroll", () => { if (!pop.hidden && Math.abs(scrollY - popY) > 60) { pop.hidden = true; popFor = null; } }, { passive: true });
+  $("#glossList").innerHTML = Object.entries(GLOSS).map(([k, [n, d]]) => `<div id="g-${k}"><dt>${n}</dt><dd>${d}</dd></div>`).join("");
+  const term = (k, text) => `<button type="button" class="term" data-term="${k}">${text}</button>`;
+
+  function drawFlow() {
+    const svg = $("#flow"); if (!svg) return;
+    const acc = css("--accent"), rule = css("--rule"), ink = css("--ink"), surf = css("--surface"), pap = css("--paper");
+    const steps = [
+      ["Beam meets target", "⁵⁴Cr ions at 10% of", "light speed hit ²⁴⁸Cm"],
+      ["Nuclei fuse", "³⁰²Ubn forms hot,", "then sheds 4 neutrons"],
+      ["Separator", "magnets steer the", "survivor off the beam"],
+      ["Detector", "the atom lodges in", "silicon after ~1 µs"],
+      ["Decay chain", "each α decay is", "timed and measured"],
+      ["Known nucleus", "the chain reaches ²⁹⁴Og,", "seen before: proof"],
+    ];
+    const bw = 160, gap = 20, x0 = 8, y0 = 16;
+    let s = "";
+    steps.forEach(([t, a, b], i) => {
+      const x = x0 + i * (bw + gap);
+      s += `<rect x="${x}" y="${y0}" width="${bw}" height="150" rx="12" fill="${i === 5 ? css("--accent-soft") : pap}" stroke="${i === 5 ? acc : rule}" stroke-width="${i === 5 ? 2 : 1}"/>`;
+      s += `<text class="t-num" x="${x + 14}" y="${y0 + 24}">${i + 1}</text>`;
+      s += `<text x="${x + 14}" y="${y0 + 112}" style="font-weight:700">${t}</text>`;
+      s += `<text class="t-small" x="${x + 14}" y="${y0 + 130}">${a}</text><text class="t-small" x="${x + 14}" y="${y0 + 146}">${b}</text>`;
+      if (i < 5) s += `<path d="M${x + bw + 4},${y0 + 60} l${gap - 10},0" stroke="${ink}" stroke-width="1.5" fill="none"/><path d="M${x + bw + gap - 6},${y0 + 60} l-6,-4 l0,8 z" fill="${ink}"/>`;
+      const cx = x + bw / 2, cy = y0 + 62;
+      // small pictograms built from circles and lines
+      if (i === 0) s += `<circle cx="${cx - 40}" cy="${cy}" r="9" fill="${css("--m-beta")}"/><path d="M${cx - 28},${cy} l26,0" stroke="${ink}" stroke-dasharray="3 3"/><circle cx="${cx + 18}" cy="${cy}" r="18" fill="${css("--m-ec")}"/>`;
+      if (i === 1) { s += `<circle cx="${cx - 6}" cy="${cy}" r="22" fill="${css("--m-alpha")}"/>`; for (let k = 0; k < 4; k++) s += `<circle cx="${cx + 26 + (k % 2) * 12}" cy="${cy - 18 + k * 12}" r="3.5" fill="${ink}"/>`; }
+      if (i === 2) s += `<path d="M${cx - 44},${cy + 20} q44,-50 88,-30" stroke="${acc}" stroke-width="2.5" fill="none"/><path d="M${cx - 44},${cy + 22} l88,0" stroke="${css("--ink-3")}" stroke-width="5" opacity="0.35"/><rect x="${cx - 14}" y="${cy - 30}" width="28" height="12" rx="3" fill="${css("--ink-2")}"/>`;
+      if (i === 3) s += `<rect x="${cx - 34}" y="${cy - 26}" width="68" height="52" rx="4" fill="${surf}" stroke="${css("--ink-2")}"/><circle cx="${cx + 6}" cy="${cy + 4}" r="6" fill="${css("--m-alpha")}"/>`;
+      if (i === 4) { const ys = [cy - 22, cy, cy + 22]; ys.forEach((yy, k) => { s += `<circle cx="${cx - 34 + k * 30}" cy="${yy}" r="8" fill="${css("--m-alpha")}"/>`; if (k < 2) s += `<path d="M${cx - 26 + k * 30},${yy + 4} l14,14" stroke="${ink}" stroke-width="1.5"/>`; }); }
+      if (i === 5) s += `<circle cx="${cx}" cy="${cy}" r="20" fill="none" stroke="${acc}" stroke-width="3"/><path d="M${cx - 9},${cy} l6,7 l12,-14" stroke="${acc}" stroke-width="3" fill="none"/>`;
+    });
+    s += `<text class="t-small" x="${x0}" y="${y0 + 182}">One atom of element 120 might take months of beam. Steps 3–4 are where short-lived atoms are lost; step 6 is what makes a claim count.</text>`;
+    svg.innerHTML = s;
+  }
+
+  function plainReading(z, n, c, m) {
+    if (m) return `This nucleus has been made and measured. Half of a sample is gone after ${fmtT(m[0])}.`;
+    if (!c) return "";
+    const t = Math.pow(10, c[0]), fl = state.flight * 1e-6;
+    let s = `If it can be made, half of these atoms would be gone after about ${fmtT(c[0])}`;
+    if (t < 3 * fl) s += `, which is about as long as the ${state.flight.toFixed(1)} µs flight to the detector, so many would be lost on the way`;
+    else if (t > 1) s += `, long enough for single-atom chemistry`;
+    s += `. It most likely decays by ${MODE_NAME[c[2]]}`;
+    s += c[2] === "a" ? ", which keeps the decay chain going." : c[2] === "f" ? ", which ends the chain before it reaches known nuclei." : ".";
+    return s;
+  }
+
+  function tour(kind) {
+    const go = (id) => document.getElementById(id).scrollIntoView({ block: "start" });
+    if (kind === "og") { state.sel = [118, 176]; renderChart(); renderReading(); go("chart-sec"); }
+    if (kind === "ubn") { state.sel = [120, 178]; renderChart(); renderReading(); go("chart-sec"); }
+    if (kind === "hyp") { state.hyp = "Z=120"; save(); state.sel = [120, 178]; renderAll(); go("chart-sec"); }
+    if (kind === "cr") { state.elem = 120; state.rx = D.reactions.find(r => r.Z === 120 && r.beam === "54Cr" && r.target === "248Cm") || null; renderElem(); renderPlanner(); go("plan"); }
+  }
+  document.querySelector(".tour").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) tour(b.dataset.tour); });
+
+  renderElem(); renderAll(); renderChecks(); drawFlow();
   const mq = matchMedia("(prefers-color-scheme: dark)");
-  const rethemed = () => { renderChart(); renderPlanner(); renderChecks(); };
+  const rethemed = () => { renderChart(); renderPlanner(); renderChecks(); drawFlow(); };
   mq.addEventListener && mq.addEventListener("change", rethemed);
   new MutationObserver(rethemed).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 })();
